@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../styles/login.css"; 
 
@@ -15,13 +15,14 @@ export default function LoginPage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
+    setErrors({}); // reset errors before making the request
 
+    // email raw password rakhda valid xa ki nai herni 
     if (!form.email.trim()) return setErrors({ email: "Email is required" });
     if (!form.password) return setErrors({ password: "Password is required" });
 
     try {
-      setLoading(true);
+      setLoading(true); // request suru huda loading true garne
 
       const resp = await fetch(`${API_BASE}/api/auth/login/`, {
         method: "POST",
@@ -30,13 +31,19 @@ export default function LoginPage() {
       });
 
       const data = await resp.json().catch(() => null);
-
       if (!resp.ok) {
-        setErrors({ general: data?.detail || "Login failed" });
-        return;
+      if (resp.status === 401) {
+        setErrors({ general: "Invalid username or password." });
+      } else if (resp.status === 403) {
+        setErrors({ general: "Account is disabled. Contact support." });
+      } else {
+        setErrors({ general: data?.detail || "Login failed. Please try again." });
       }
+      return;
+    }
 
-      // Save tokens
+
+      // Save tokens yedi login successful bhayo vanay
       localStorage.setItem("access", data.access);
       localStorage.setItem("refresh", data.refresh);
       localStorage.setItem("user", JSON.stringify(data.user));

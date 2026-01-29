@@ -3,15 +3,23 @@ import { Link, useNavigate } from "react-router-dom";
 import "../styles/Navbar.css";
 import logo from "../assets/mainlogo.jpg";
 
-
-
- function Navbar() {
+function Navbar() {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState(null);
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
-
   useEffect(() => {
+    // Check for user in localStorage on mount
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+      }
+    }
+
     const onDocClick = (e) => {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(e.target)) setOpen(false);
@@ -25,19 +33,22 @@ import logo from "../assets/mainlogo.jpg";
     navigate(path);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    setUser(null);
+    setOpen(false);
+    navigate("/login");
+  };
+
   return (
     <header className="nav">
       <div className="nav__left">
-        {/* <Link to="/" className="nav__brand">
-          {logo}
-          <div className="nav__logoBox">
-            <span className="nav__logoText">Roam Nepal Stay</span>
-          </div>
-        </Link> */}
         <Link to="/" className="nav__brand">
-        <img src={logo} alt="Roam Nepal Stay" className="nav__logo" />
-        <span className="nav__logoText">Roam Nepal Stay</span>
-      </Link>
+          <img src={logo} alt="Roam Nepal Stay" className="nav__logo" />
+          <span className="nav__logoText">Roam Nepal Stay</span>
+        </Link>
       </div>
 
       <div className="nav__center">
@@ -67,12 +78,31 @@ import logo from "../assets/mainlogo.jpg";
 
           {open && (
             <div className="nav__dropdown">
-              <button className="nav__dropItem" onClick={() => go("/login")}>
-                Log In
-              </button>
-              <button className="nav__dropItem nav__dropItem--accent" onClick={() => go("/register")}>
-                Register
-              </button>
+              {user ? (
+                <>
+                  <div className="nav__userGreeting">
+                    Hello, {user.first_name || user.email}
+                  </div>
+                  <button className="nav__dropItem" onClick={() => go("/profile")}>
+                    Profile
+                  </button>
+                  <button className="nav__dropItem" onClick={handleLogout}>
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="nav__dropItem" onClick={() => go("/login")}>
+                    Log In
+                  </button>
+                  <button
+                    className="nav__dropItem nav__dropItem--accent"
+                    onClick={() => go("/register")}
+                  >
+                    Register
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
