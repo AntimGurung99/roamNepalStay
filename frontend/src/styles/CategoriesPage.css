@@ -1,0 +1,132 @@
+.categories-page {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.categories-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.categories-subtitle {
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 18px;
+}
+
+/* Grid: 4 columns */
+.category-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 26px;
+}
+
+/* Card */
+.category-card {
+  position: relative;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+
+  background-size: cover;
+  background-position: center;
+
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  transform: translateZ(0);
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+}
+
+/* Center last two cards */
+.category-card--center {
+  grid-row: 2;
+}
+
+/* 5th card */
+.category-card--center:nth-last-child(2) {
+  grid-column: 2;
+}
+
+/* 6th card */
+.category-card--center:nth-last-child(1) {
+  grid-column: 3;
+}
+
+
+/* Overlay */
+.category-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  transition: background 0.25s ease;
+}
+
+/* Name */
+.category-name {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: white;
+  font-size: 20px;
+  font-weight: 700;
+  z-index: 2;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+}
+
+/* Hover effects */
+.category-card:hover {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.category-card:hover .category-overlay {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .category-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* When 3 columns, remove forced center layout */
+  .category-card--center {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .category-card {
+    height: 180px;
+  }
+
+  /* When 2 columns, remove forced center layout */
+  .category-card--center {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* When 1 column, remove forced center layout */
+  .category-card--center {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}

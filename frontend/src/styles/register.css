@@ -1,0 +1,105 @@
+
+.register-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+
+.register-title {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+
+/* Card */
+.register-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  backdrop-filter: blur(8px);
+}
+
+
+/* .register-card {
+  width: 700px;
+  height: 600px;      
+  padding: 40px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+
+  box-sizing: border-box;
+} */
+
+
+/* Form layout */
+.register-form {
+  display: grid;
+  gap: 10px;
+}
+
+/* Inputs */
+.register-form input {
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  outline: none;
+}
+
+/* Button */
+.register-btn {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: white;
+  font-weight: bold;
+}
+
+/* Errors */
+.error-text {
+  color: #ffb4b4;
+  font-size: 12px;
+}
+
+/* Login link */
+.login-link {
+  margin-top: 10px;
+}
+
+.register-page {
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+
+.register-form input {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.95);
+  outline: none;
+  box-sizing: border-box;
+}
+.register-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.custom-toast {
+  font-size: 14px;
+  border-radius: 8px;
+}
