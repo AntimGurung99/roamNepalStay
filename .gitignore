@@ -1,6 +1,44 @@
+# =========================
+# Python Virtual Environment
+# =========================
 myenv/
-node_modules/
+venv/
+env/
+
+# =========================
+# Python Cache
+# =========================
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Environment Variables (VERY IMPORTANT)
+# =========================
 .env
+
+# =========================
+# Django
+# =========================
+roamnepalstay/media/
+staticfiles/
+*.log
+
+# =========================
+# React / Node
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# =========================
+# VS Code
+# =========================
 .vscode/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
