@@ -1,0 +1,191 @@
+/* ListingsGrid.css */
+.listings-section {
+  padding: 40px 10%;
+  background: white;
+}
+
+.listings-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 30px;
+}
+
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 32px 24px;
+}
+
+/* Card Styles */
+.listing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  padding: 8px;
+  background: #fff;
+}
+
+.listing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.listing-card:hover .image-arrow {
+  opacity: 1;
+}
+
+.listing-image-container {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.listing-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.listing-card:hover .listing-image-container img {
+  transform: scale(1.05);
+}
+
+.wishlist-heart-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 10;
+  font-size: 24px;
+  color: white;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wishlist-heart-btn:hover {
+  transform: scale(1.2);
+}
+
+.wishlist-heart-btn.active {
+  color: #ff385c;
+  filter: none;
+}
+
+.wishlist-heart-btn.active i {
+  color: #ff385c;
+}
+
+/* Image Slider Arrows */
+.image-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 2;
+  font-size: 18px;
+  color: #222;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.image-arrow:hover {
+  background: white;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.image-arrow.left {
+  left: 12px;
+}
+
+.image-arrow.right {
+  right: 12px;
+}
+
+/* Info Styles */
+.listing-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+}
+
+.listing-card-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: #222;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.listing-card-highlight {
+  color: #ff385c;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.listing-card-location {
+  font-weight: 400;
+  font-size: 15px;
+  color: #717171;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.listing-card-location i {
+  color: #ff385c;
+  font-size: 14px;
+}
+
+.listing-card-price {
+  margin-top: auto;
+  font-size: 15px;
+  color: #222;
+}
+
+.listing-card-price strong {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.no-listings {
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 100px 0;
+  font-size: 18px;
+  color: #717171;
+}
+
+@media (max-width: 768px) {
+  .listings-section {
+    padding: 20px 5%;
+  }
+}

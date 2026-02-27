@@ -43,12 +43,21 @@ export default function LoginPage() {
     }
 
 
-      // Save tokens yedi login successful bhayo vanay
-      localStorage.setItem("access", data.access);
-      localStorage.setItem("refresh", data.refresh);
-      localStorage.setItem("user", JSON.stringify(data.user));
-
-      navigate("/");
+      // SAVE USER DATA & REDIRECT LOGIC:
+      // We store the tokens and user profile in localStorage. 
+      // The user object contains 'is_staff' which determines their access level.
+      localStorage.setItem('access', data.access);
+      localStorage.setItem('refresh', data.refresh);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // REDIRECT BASED ON STAFF STATUS:
+      // If the user has staff privileges (is_staff=True), we send them to the Admin Dashboard.
+      // If they are a regular user (is_staff=False), we send them to the Home Page.
+      if (data.user.is_staff || data.user.is_superuser) {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     } catch {
       setErrors({ general: "Network error. Is backend running?" });
     } finally {
