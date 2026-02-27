@@ -39,9 +39,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'rest_framework',
+    "rest_framework",
+    "rest_framework_simplejwt",  # JWT authentication
     "corsheaders",
-    'rentit',
+    "rentit",
 ]
 
 
@@ -123,6 +124,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 STATIC_URL = "static/"
 
+
 AUTH_USER_MODEL = "rentit.User"
 
 DATABASES = {
@@ -140,8 +142,83 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+}
+
+# JWT Settings - JWT token ko configuration
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
 }
 
 
+# Jazzmin Settings
+JAZZMIN_SETTINGS = {
+    "site_title": "Roam Nepal Stay Admin",
+    "site_header": "Roam Nepal Stay",
+    "site_brand": "Roam Nepal Stay",
+    "welcome_sign": "Welcome to Roam Nepal Stay Admin",
+    "copyright": "Roam Nepal Stay Ltd",
+    "search_model": ["rentit.User", "rentit.Listing"],
+    "user_avatar": "profile_image",
+    "topmenu_links": [
+        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"model": "rentit.User"},
+        {"app": "rentit"},
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "order_with_respect_to": [
+        "rentit",
+        "rentit.User",
+        "rentit.Listing",
+        "rentit.Booking",
+    ],
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "rentit.User": "fas fa-user",
+        "rentit.Listing": "fas fa-home",
+        "rentit.Booking": "fas fa-calendar-check",
+        "rentit.Review": "fas fa-star",
+        "rentit.HostApplication": "fas fa-file-contract",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {
+        "auth.user": "collapsible",
+        "auth.group": "vertical_tabs",
+    },
+}
 
-
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-primary",
+    "accent": "accent-primary",
+    "navbar": "navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": False,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": False,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "theme": "flatly",
+    "dark_mode_theme": "darkly",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
+    },
+}
