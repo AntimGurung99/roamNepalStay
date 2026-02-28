@@ -1,15 +1,46 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
 from django.db.models import Q
 
 
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def _create_user(self, email, password, **extra_fields):
+        if not email:
+            raise ValueError("The Email must be set")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_user(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", False)
+        extra_fields.setdefault("is_superuser", False)
+        return self._create_user(email, password, **extra_fields)
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff= True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+        return self._create_user(email, password, **extra_fields)
+
+
 # user haru sabai ko lagi infromation
 class User(AbstractUser):
-    first_name = models.CharField(max_length=150, blank=False)
-    last_name = models.CharField(max_length=150, blank=False)
+    username = None  # username field lai hatauna
     email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=15, blank=False)
+    last_name = models.CharField(max_length=15, blank=False)
+    # email = models.EmailField(unique=True)
 
     # host banna chaahnay user ko lagii
     is_host = models.BooleanField(default=False)
@@ -23,27 +54,41 @@ class User(AbstractUser):
         ],
         default="none",
     )
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-    profile_image = models.ImageField(upload_to="profile_images/", blank=True, null=True)
+    phone_number = models.CharField(max_length=10, blank=True, null=True)
+
+    # address = models.TextField(blank=True, null=True)
+    profile_image = models.ImageField(
+        upload_to="profile_images/", blank=True, null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     last_login_at = models.DateTimeField(blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    city = models.CharField(max_length=30)
+    country = models.CharField(max_length=60, default="Nepal")
+    accepted_terms = models.BooleanField(default=False)
+    accepted_terms_at = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=~Q(first_name="") & ~Q(last_name=""),
-                name="first_last_not_empty",
-            ),
-            UniqueConstraint(
-                Lower("first_name"),
-                Lower("last_name"),
-                name="uniq_first_last_case_insensitive",
-            ),
-        ]
+    # class Meta:
+    #     email = models.EmailField(unique=True)
+    # constraints = [
+    #     models.CheckConstraint(
+    #         condition=~Q(first_name="") & ~Q(last_name=""),
+    #         name="first_last_not_empty",
+    #     ),
+    #     UniqueConstraint(
+    #         Lower("first_name"),
+    #         Lower("last_name"),
+    #         name="uniq_first_last_case_insensitive",
+    #     ),
+    # ]
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
+
+    objects = UserManager()
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}<{self.email}>"
+        return self.email
 
 
 # host banna chaahnay user haru ko lagi detials store garna
@@ -338,6 +383,3 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.listing.title}"
-
-
-

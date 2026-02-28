@@ -1,18 +1,37 @@
 from django.contrib.auth import get_user_model, authenticate
+from django.core.validators import validate_email
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+import re
 from .models import Listing, ListingImage, HostApplication, Booking, Review, Wishlist
+
 
 User = get_user_model()
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    # email = serializers.EmailField(
+    #     required=True, error_messages={"invalid": "Enter a valid email address"}
+    # )
+    # password = serializers.CharField(write_only= True, required = True)
     confirm_password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "email", "password", "confirm_password")
+        fields = (
+            "first_name",
+            "last_name",
+            "email",
+            "password",
+            "confirm_password",
+            "phone_number",
+            "profile_image",
+            "date_of_birth",
+            "city",
+            "country",
+            "accepted_terms",
+        )
         extra_kwargs = {"password": {"write_only": True}}
 
     def validate(self, attrs):
@@ -34,6 +53,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"confirm_password": ["Confirm password is required."]}
             )
+        # password check
         if password != confirm_password:
             raise serializers.ValidationError(
                 {"confirm_password": ["Passwords do not match."]}
@@ -43,15 +63,37 @@ class RegisterSerializer(serializers.ModelSerializer):
             validate_password(password)
         except DjangoValidationError as e:
             raise serializers.ValidationError({"password": e.messages})
+        # Built=in email format validation
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            raise serializers.ValidationError({"email": "Enter a valid email address."})
 
-        if User.objects.filter(
-            first_name__iexact=first_name, last_name__iexact=last_name
-        ).exists():
-            raise serializers.ValidationError({"name": ["Same name already exists."]})
+        # Extra strict validation()
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_regex, email):
+            raise serializers.ValidationError({"email": "Invalid email format."})
+        # prevent numeric only usernames
+        local_part = email.split("@")[0]
+        if local_part.isdigit():
+            raise serializers.ValidationError(
+                {"email": "Email cannot start with only numbers."}
+            )
 
+        # email uniqueness
         if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError({"email": ["Email already exists."]})
+            raise serializers.ValidationError({"email": "Email already exists."})
 
+        # terms acceptance
+        if attrs.get("accepted_terms") is not True:
+            raise serializers.ValidationError(
+                {"accepted_terms": "You must accepts and conditions."}
+            )
+
+        # if User.objects.filter(
+        #     first_name__iexact=first_name, last_name__iexact=last_name
+        # ).exists():
+        #     raise serializers.ValidationError({"name": ["Same name already exists."]})
         attrs["first_name"] = first_name
         attrs["last_name"] = last_name
         attrs["email"] = email
@@ -60,21 +102,44 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("confirm_password")
 
-        user = User(
-            username=validated_data["email"],
+        user = User.objects.create_user(
             email=validated_data["email"],
+            password=validated_data["password"],
             first_name=validated_data["first_name"],
             last_name=validated_data["last_name"],
+            phone_number=validated_data.get("phone_number"),
+            city=validated_data.get("city"),
+            country=validated_data.get("country"),
+            accepted_terms=validated_data.get("accepted_terms"),
         )
-        user.set_password(validated_data["password"])
-        user.save()
+
         return user
 
 
 class RegisterResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "first_name", "last_name", "email", "is_host", "host_application_status")
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "city",
+            "country",
+            "is_host",
+            "host_application_status",
+        )
+
+    read_only_fields = (
+        "id",
+        "first_name",
+        "last_name",
+        "email",
+        "city",
+        "country",
+        "is_host",
+        "host_application_status",
+    )
 
 
 class LoginSerializer(serializers.Serializer):
@@ -191,7 +256,13 @@ class HostApplicationSerializer(serializers.ModelSerializer):
             "applied_at",
             "updated_at",
         ]
-        read_only_fields = ["user", "status", "reviewed_by", "reviewed_at", "review_notes"]
+        read_only_fields = [
+            "user",
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "review_notes",
+        ]
 
     def get_user_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}"
@@ -364,13 +435,35 @@ class ListingDetailSerializer(serializers.ModelSerializer):
     def get_amenities(self, obj):
         """Return list of enabled amenities"""
         amenity_fields = [
-            'wifi', 'parking', 'kitchen', 'air_conditioning', 'heating',
-            'bath_tub', 'personal_care', 'outdoor_shower', 'washer', 'dryer',
-            'hangers', 'iron', 'tv', 'dedicated_workspace', 'security_cameras',
-            'fire_extinguisher', 'first_aid', 'cooking_set', 'refrigerator',
-            'microwave', 'stove', 'barbecue_grill', 'outdoor_dining_area',
-            'private_patio_or_balcony', 'camp_fire', 'garden', 'free_parking',
-            'self_check_in', 'pet_allowed'
+            "wifi",
+            "parking",
+            "kitchen",
+            "air_conditioning",
+            "heating",
+            "bath_tub",
+            "personal_care",
+            "outdoor_shower",
+            "washer",
+            "dryer",
+            "hangers",
+            "iron",
+            "tv",
+            "dedicated_workspace",
+            "security_cameras",
+            "fire_extinguisher",
+            "first_aid",
+            "cooking_set",
+            "refrigerator",
+            "microwave",
+            "stove",
+            "barbecue_grill",
+            "outdoor_dining_area",
+            "private_patio_or_balcony",
+            "camp_fire",
+            "garden",
+            "free_parking",
+            "self_check_in",
+            "pet_allowed",
         ]
         return [field for field in amenity_fields if getattr(obj, field, False)]
 
@@ -463,9 +556,6 @@ class AdminStatsSerializer(serializers.Serializer):
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
     recent_bookings = BookingListSerializer(many=True)
     recent_reviews = ReviewListSerializer(many=True)
-
-
-
 
 
 class ListingCreateSerializer(serializers.ModelSerializer):
