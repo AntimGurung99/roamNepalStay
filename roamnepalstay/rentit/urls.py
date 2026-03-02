@@ -1,6 +1,6 @@
 from django.urls import path, include
 
-from .views_simple import RegisterAPIView, LoginAPIView
+from .views import RegisterAPIView, LoginAPIView
 from .test_views import TestAPIView
 from .views import (
     HostApplicationCreateView,
@@ -13,6 +13,8 @@ from .views import (
     ListingViewSet,
     WishlistViewSet,
     UserProfileView,
+    VerifyOTPAPIView,
+    ResendOTPAPIView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -44,6 +46,9 @@ urlpatterns = [
         HostApplicationCreateView.as_view(),
         name="host-application-create",
     ),
+    # OPTVERIFY AND RESEND
+    path("auth/verify-otp/", VerifyOTPAPIView.as_view(), name="verify-otp"),
+    path("auth/resend-otp/", ResendOTPAPIView.as_view(), name="resend-otp"),
     # Admin routes router bata
     path("", include(router.urls)),
 ]

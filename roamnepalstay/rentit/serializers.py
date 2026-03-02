@@ -116,6 +116,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    otp = serializers.CharField(required=True, max_length=6, min_length=6)
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+
 class RegisterResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -160,6 +169,10 @@ class LoginSerializer(serializers.Serializer):
         if not user:
 
             raise serializers.ValidationError({"detail": "Invalid email or password."})
+        if not user.is_email_verified:
+            raise serializers.ValidationError(
+                {"details": "Please verify your email first"}
+            )
 
         attrs["user"] = user
         return attrs

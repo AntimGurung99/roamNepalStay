@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
 from django.db.models import Q
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -81,6 +82,10 @@ class User(AbstractUser):
     #         name="uniq_first_last_case_insensitive",
     #     ),
     # ]
+    # Email verification (OTP)
+    is_email_verified = models.BooleanField(default=False)
+    email_otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]

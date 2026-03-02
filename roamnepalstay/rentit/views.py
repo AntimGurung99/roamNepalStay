@@ -28,6 +28,9 @@ from .serializers import (
 from .models import Listing, ListingImage, HostApplication, Booking, Review, Wishlist
 from rest_framework import viewsets, permissions
 from .permissions import IsAdminUserRole
+from .utils import send_otp_email
+from .serializers import VerifyOTPSerializer, ResendOTPSerializer
+
 
 User = get_user_model()
 
@@ -40,9 +43,87 @@ class RegisterAPIView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.save()
-        data = RegisterResponseSerializer(user).data
+        try:
+            send_otp_email(user)
+            otp_sent = True
+        except Exception:
+            otp_sent = False
+        user_data = RegisterResponseSerializer(user).data
 
-        return Response(data, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "detail": (
+                    "Registered successfully. OTP sent to your email. Please verify."
+                    if otp_sent
+                    else "Registered successfully, but OTP could not be sent. Please try resend OTP."
+                ),
+                "user": user_data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyOTPAPIView(APIView):
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].strip().lower()
+        otp = serializer.validated_data["otp"].strip()
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response(
+                {"details": "User not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if user.is_email_verified:
+            return Response(
+                {"details": "Email already verified."}, status=status.HTTP_200_OK
+            )
+        if not user.email_otp or user.email_otp != otp:
+            return Response(
+                {"details": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        # OPT EXPIRY TIME 10 MINUTES
+        if (
+            user.otp_created_at
+            and (timezone.now() - user.otp_created_at).total_seconds() > 600
+        ):
+            return Response(
+                {"detials": "OTP exired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.is_email_verified = True
+        user.email_otp = None
+        user.save(update_fields=["is_email_verified", "email_otp"])
+
+        return Response(
+            {"details": "Email verified successfully."}, status=status.HTTP_200_OK
+        )
+
+
+class ResendOTPAPIView(APIView):
+    def post(self, request):
+        serializer = ResendOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].strip().lower()
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response(
+                {"details": "User not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if user.is_email_verified:
+            return Response(
+                {"details": "Email already verified."}, status=status.HTTP_200_OK
+            )
+        send_otp_email(user)
+        return Response(
+            {"details": "OTP resent successfully."}, status=status.HTTP_200_OK
+        )
 
 
 # yeslay current user ko profile data return garcha raw host status refresh garna ko lagii admin le approve garepachi
@@ -379,9 +460,12 @@ class AdminListingViewSet(GenericViewSet):
             )
         except Exception as e:
             import traceback
+
             print(f"DEBUG: Error in AdminListingViewSet.retrieve: {str(e)}")
             traceback.print_exc()
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
@@ -526,7 +610,9 @@ class ListingViewSet(GenericViewSet):
     def list(self, request):
         # published listings matra dekhaucha
         listings = Listing.objects.filter(status="published").order_by("-created_at")
-        serializer = ListingListSerializer(listings, many=True, context={"request": request})
+        serializer = ListingListSerializer(
+            listings, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -609,14 +695,18 @@ class ListingViewSet(GenericViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
     def toggle_wishlist(self, request, pk=None):
         listing = self.get_object()
         wishlist_item = Wishlist.objects.filter(user=request.user, listing=listing)
 
         if wishlist_item.exists():
             wishlist_item.delete()
-            return Response({"is_wishlisted": False, "message": "Removed from wishlist"})
+            return Response(
+                {"is_wishlisted": False, "message": "Removed from wishlist"}
+            )
         else:
             Wishlist.objects.create(user=request.user, listing=listing)
             return Response({"is_wishlisted": True, "message": "Added to wishlist"})
@@ -638,5 +728,3 @@ class WishlistViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
-
