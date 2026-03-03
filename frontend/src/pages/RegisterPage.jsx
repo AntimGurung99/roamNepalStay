@@ -1,160 +1,185 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {useState} from "react";
+import api from "../api/axios";
+import {Link, useNavigate} from "react-router-dom";
 import "../styles/register.css";
-import { toast } from "react-toastify";
 
-const API_BASE = "http://127.0.0.1:8000";
-
-function RegisterPage() {
+function RegisterPage(){
   const navigate = useNavigate();
-
-  const [form, setForm] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    password: "",
-    confirm_password: "",
+  const [Form, setForm] = useState({
+    email:"",
+    first_name:"",
+    last_name:"",
+    password:"",
+    confirm_password:"",
+    phone_number:"",
+    city:"",
+    country:"",
+    date_of_birth:"",
+    accepted_terms: false,
   });
-
-  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const onChange = (e) => {
-    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-  };
-
-  const validateClient = () => {
-    const e = {};
-    if (!form.first_name.trim()) e.first_name = "First name is required";
-    if (!form.last_name.trim()) e.last_name = "Last name is required";
-    if (!form.email.trim()) e.email = "Email is required";
-    if (!form.password) e.password = "Password is required";
-    if (form.password !== form.confirm_password)
-      e.confirm_password = "Passwords do not match";
-    return e;
-  };
-
-  const onSubmit = async (ev) => {
-    ev.preventDefault();
-    setErrors({});
-
-    const clientErrors = validateClient();
-    if (Object.keys(clientErrors).length) {
-      setErrors(clientErrors);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const resp = await fetch(`${API_BASE}/api/auth/register/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+    const onChange = (e) => {
+      const { name, value, type, checked } = e.target;
+      setForm({
+        ...Form,
+        [name]: type === "checkbox" ? checked : value,
       });
-
-      const data = await resp.json().catch(() => null);
-
-      if (!resp.ok) {
-        
-        if (data && typeof data === "object") {
-          const flat = {};
-          for (const key of Object.keys(data)) {
-            flat[key] = Array.isArray(data[key]) ? data[key][0] : String(data[key]);
-          }
-          setErrors(flat);
-
-          
-          toast.error("Registration failed. Please check the form.");
-        } else {
-          setErrors({ general: "Registration failed. Please try again." });
-          toast.error("Registration failed. Please try again.");
-        }
+    };
+  
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      setError("");
+      if(Form.password !== Form.confirm_password){
+        setError ("Password do not match. please try again.");
         return;
       }
-
-      toast.success("Registration successfull..", {
-        position: "top-right",
-        autoClose: 4000,
-      });
-
-      
-      setTimeout(() => {
+      const payload = {
+        email:Form.email,
+        first_name:Form.first_name,
+        last_name:Form.last_name,
+        password:Form.password,
+        phone_number:Form.phone_number || null,
+        city:Form.city,
+        country:Form.country || null,
+        date_of_birth:Form.date_of_birth || null,
+        accepted_terms:Form.accepted_terms,
+      };
+      try {
+        setLoading(true);
+        await api.post("/auth/register/", payload);
+        toast.success("Registration successful! Please login.");
         navigate("/login");
-      }, 1000);
-    } catch (err) {
-      setErrors({ general: "Network error. Is the backend running on port 8000?" });
-      toast.error("Network error. Is the backend running on port 8000?");
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (err){
+        const msg = err?.response?.data?.details ||
+        (typeof err?.response?.data === "string" ? err.response.data : null) || "Registration failed. Please try again.";
+          setError(msg); 
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    return(
+      <div className="top-register-page">
+          <div className="overlay">
+        <div className="register-form-container card--wide">
 
-  return (
-    <div className="register-page">
-      <form className="register-card" onSubmit={onSubmit}>
-        <h2 className="register-title">Register</h2>
+          {error && (<div className="register-error">{error}</div>)}
 
-        {errors.general && <p className="error-text">{errors.general}</p>}
-        {errors.name && <p className="error-text">{errors.name}</p>}
+        <form onSubmit={onSubmit} className="register-form">
+        <div className="grid">
 
-        <div className="register-form">
-          <input
-            name="first_name"
-            placeholder="First Name"
-            value={form.first_name}
-            onChange={onChange}
-          />
-          {errors.first_name && <small className="error-text">{errors.first_name}</small>}
 
-          <input
-            name="last_name"
-            placeholder="Last Name"
-            value={form.last_name}
-            onChange={onChange}
-          />
-          {errors.last_name && <small className="error-text">{errors.last_name}</small>}
+        <div className="input-field-one">
+          <div className="input-field">
+        <input name="first_name"
+         value={Form.first_name} 
+         onChange={onChange}
+         placeholder="First Name"
+         required
+         />
 
-          <input
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={onChange}
-          />
-          {errors.email && <small className="error-text">{errors.email}</small>}
+         </div>
 
-          <input
-            name="password"
-            type="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={onChange}
-          />
-          {errors.password && <small className="error-text">{errors.password}</small>}
+         <div className="input-field">
+        <input name="last_name"
+         value={Form.last_name} 
+         onChange={onChange} 
+         placeholder="Last Name" 
+         required
+         />
+         </div>
+         </div>
 
-          <input
-            name="confirm_password"
-            type="password"
-            placeholder="Confirm Password"
-            value={form.confirm_password}
-            onChange={onChange}
-          />
-          {errors.confirm_password && (
-            <small className="error-text">{errors.confirm_password}</small>
-          )}
 
-          <button className="register-btn" type="submit" disabled={loading}>
-            {loading ? "Registering..." : "REGISTER"}
-          </button>
-
-          <p className="login-link">
-            Already have an account? <Link to="/login">Log in</Link>
-          </p>
+         <div className="input-field">
+        <input name="email"
+         value={Form.email} 
+         onChange={onChange} 
+         placeholder="Enter your email" 
+         required/>
         </div>
-      </form>
-    </div>
-  );
-}
+
+        <div className="input-field">
+        <input name="phone_number"
+         value={Form.phone_number}
+         onChange={onChange} 
+        placeholder="98xxxxxxxx" 
+        maxLength={10}
+        />
+       </div>
+ 
+        <div className="input-field-two"> 
+        <div className="input-field">
+        <input name="city"
+          value={Form.city}
+          onChange={onChange} 
+          placeholder="City"
+          required
+        />
+        </div>
+        
+        <div className="input-field">
+        <input name="country" 
+          value={Form.country}  
+          onChange={onChange} 
+          placeholder="Country"
+        />
+        </div>
+        </div>
+
+        <div className="input-field">
+        <input name="date_of_birth" 
+            value={Form.date_of_birth} 
+            onChange={onChange} type="date" 
+            placeholder="Date of Birth (Optional)"
+        />
+        </div>
+
+
+        <div className="input-field">
+        <input
+        type="password"
+        name="password"
+        value={Form.password}
+        onChange={onChange}
+        placeholder="Password"
+        required
+        />
+        </div>
+
+       <div className="input-field">
+        <input
+        type="password"
+        name="confirm_password"
+        value={Form.confirm_password}
+        onChange={onChange}
+        placeholder="Confirm Password"
+        required
+        />
+      </div>
+      </div>
+
+        <label className="register-terms">
+          <input
+            type="checkbox"
+            name="accepted_terms"
+            checked={Form.accepted_terms}
+            onChange={onChange}
+          />
+          <span>I agree to the Terms and Conditions</span>
+        </label>
+
+        <button disabled={loading} type="submit" className="register-btn">{loading ? "Creating...":"Register"}</button>
+
+        <p className="register-footer">Already have an account? <Link to="/login">Login</Link></p>
+        </form> 
+      </div>
+      </div>
+      </div>
+    
+    );
+  }
 
 export default RegisterPage;

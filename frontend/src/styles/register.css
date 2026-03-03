@@ -1,105 +1,228 @@
-
-.register-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: #f5f5f5;
+body {
+  overflow-y: hidden;
 }
 
-
-.register-title {
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-
-/* Card */
-.register-card {
-  width: 100%;
-  max-width: 420px;
-  padding: 24px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.55);
-  color: white;
-  backdrop-filter: blur(8px);
-}
-
-
-/* .register-card {
-  width: 700px;
-  height: 600px;      
-  padding: 40px;
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.55);
-  color: white;
-
-  box-sizing: border-box;
-} */
-
-
-/* Form layout */
-.register-form {
-  display: grid;
-  gap: 10px;
-}
-
-/* Inputs */
-.register-form input {
-  padding: 10px;
-  border-radius: 6px;
-  border: none;
-  outline: none;
-}
-
-/* Button */
-.register-btn {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  background: white;
-  font-weight: bold;
-}
-
-/* Errors */
-.error-text {
-  color: #ffb4b4;
-  font-size: 12px;
-}
-
-/* Login link */
-.login-link {
-  margin-top: 10px;
-}
-
-.register-page {
+/* full page css */
+.top-register-page {
   min-height: 100vh;
   width: 100%;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: #f5f5f5;
-}
-
-
-.register-form input {
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.95);
-  outline: none;
-  box-sizing: border-box;
-}
-.register-wrapper {
-  min-height: 100vh;
+  background: url("../images/register.jpg") center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0px;
 }
-.custom-toast {
+
+
+/* padhna sakni banauna dark overlay lako */
+.overlay {
+  width: 100%;
+  min-height: 100vh;
+  background: rgba(210, 198, 198, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); */
+}
+
+
+
+
+.register-form-container {
+  width: 40%;
+  /* max-width: 50px; */
+  border-radius: 22px;
+  padding: 34px;
+  background: rgba(72, 70, 70, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.card--wide {
+  max-width: 400px;
+}
+
+
+.register-error {
+  background: rgba(255, 80, 80, 0.18);
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  color: #ffd6d6;
   font-size: 14px;
+}
+
+.register-form {
+  display: grid;
+  gap: 16px;
+
+}
+
+.grid {
+  display: grid;
+  /* grid-template-columns: 1fr; */
+  gap: 16px;
+}
+
+.input-field {
+  display: grid;
+  gap: px;
+}
+
+.input-field-one,
+.input-field-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  width: 100%;
+
+}
+
+.input-field-one .input-field,
+.input-field-two .input-field {
+  min-width: none;
+}
+
+
+
+/* terms and condition ko lagi  */
+.register-terms label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 
+.input-field-one {
+  height: 33px;
+  width: 100px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 0;
+  outline: none;
+  gap: 8px;
+
+}
+
+.input-field-two {
+  height: 33px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 0;
+  outline: none;
+  gap: 8px;
+} */
+.input-field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input-field input {
+  height: 33px;
+  padding: 0 14px;
   border-radius: 8px;
+  border: 0px solid rgba(196, 186, 186, 0.16);
+  background: rgba(219, 217, 217, 0.1);
+  color: #fff;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.input-field input::placeholder {
+  color: rgba(19, 18, 18, 0.70)
+}
+
+
+.input-field input:focus {
+  border-color: rgba(16, 15, 15, 0.55);
+  background: rgba(201, 193, 193, 0.14);
+  box-shadow: 0 0 0 4px rgba(32, 28, 29, 0.18);
+  transform: translate(-1px);
+}
+
+
+.input-field--full {
+  grid-column: 1/-1;
+}
+
+.register-terms {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.register-terms {
+  margin-top: 2px;
+
+}
+
+.register-terms a {
+  color: #ff4d6d;
+
+}
+
+.register-terms a:hover {
+  text-decoration: underline;
+}
+
+.register-btn {
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  background: #ff3b5c;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: 0.25s ease;
+
+}
+
+
+.register-btn:hover {
+  transform: translateY(-2px);
+  background: #ff1f46;
+}
+
+.register-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* footer */
+.register-footer {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.register-footer a {
+  text-decoration: none;
+  color: #ff4d6d;
+}
+
+.register-footer a:hover {
+  text-decoration: underline;
+}
+
+/* responsive */
+@media (max-width: 640px) {
+
+  /* .card--wide {
+    max-width: 520;
+  } */
+  .input-field-one,
+  .input-field-two {
+    grid-template-columns: 1fr;
+  }
 }
