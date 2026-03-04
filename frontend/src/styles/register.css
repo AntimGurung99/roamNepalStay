@@ -22,7 +22,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 30px;
   /* backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px); */
 }
@@ -35,12 +35,17 @@ body {
   /* max-width: 50px; */
   border-radius: 22px;
   padding: 34px;
-  background: rgba(72, 70, 70, 0.45);
-  backdrop-filter: blur(20px);
+  /* background: rgba(72, 70, 70, 0.45); */
+  background: rgba(16, 86, 102, 0.65);
+  /* #105666 */
+  /* backdrop-filter: blur(20px); */
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 86, 102, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(18px);
 }
 
 .card--wide {
@@ -67,12 +72,27 @@ body {
 .grid {
   display: grid;
   /* grid-template-columns: 1fr; */
-  gap: 16px;
+  gap: 13px;
+  width: 100%;
 }
 
-.input-field {
+/* .input-field {
   display: grid;
-  gap: px;
+  gap: 10 px;
+} */
+
+.input {
+  height: 33px;
+  width: 100%;
+  padding: 0 14px;
+  border-radius: 8px;
+  /* background: rgba(219, 217, 217, 0.1); */
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid #6F8E95;
+  color: #000;
+  outline: none;
+  box-sizing: border-box;
+  transition: 0.2s ease;
 }
 
 .input-field-one,
@@ -81,21 +101,44 @@ body {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
   width: 100%;
-
 }
 
-.input-field-one .input-field,
+/* .input-field-one .input-field,
 .input-field-two .input-field {
-  min-width: none;
+  min-width: 10px;
+} */
+
+.input:focus {
+  background: rgba(255, 255, 255, 0.20);
+  border-color: #F7F4D5;
+  outline: none;
 }
 
+.input::placeholder {
+  color: #1f1f1f;
+}
 
+/* make calendar icon dark/black */
+.input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none !important;
+  opacity: 0.85;
+}
+
+.input[type="date"] {
+  filter: none !important;
+}
+
+.input[type="date"] {
+  color: #000;
+  /* black text */
+}
 
 /* terms and condition ko lagi  */
 .register-terms label {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
 }
+
 
 /* 
 .input-field-one {
@@ -117,43 +160,45 @@ body {
   outline: none;
   gap: 8px;
 } */
-.input-field {
+/* .input-field {
   width: 100%;
   box-sizing: border-box;
-}
-
+} */
+/* 
 .input-field input {
   height: 33px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 0px solid rgba(196, 186, 186, 0.16);
-  background: rgba(219, 217, 217, 0.1);
+  border: 2px solid rgba(0, 0, 0, 0.40);
+  background: rgba(235, 227, 227, 0.1);
   color: #fff;
   outline: none;
   transition: 0.2s ease;
 }
 
 .input-field input::placeholder {
-  color: rgba(19, 18, 18, 0.70)
-}
+  color: rgba(255, 255, 255, 0.70)
+} */
 
 
-.input-field input:focus {
-  border-color: rgba(16, 15, 15, 0.55);
-  background: rgba(201, 193, 193, 0.14);
-  box-shadow: 0 0 0 4px rgba(32, 28, 29, 0.18);
+/* .input-field input:focus {
+  border-color: rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 4px rgba(32, 28, 29, 0.18);
   transform: translate(-1px);
-}
+} */
 
-
+/* 
 .input-field--full {
   grid-column: 1/-1;
-}
+} */
 
 .register-terms {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -176,7 +221,7 @@ body {
   height: 46px;
   border: none;
   border-radius: 12px;
-  background: #ff3b5c;
+  background: #FF3B5C;
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -225,4 +270,23 @@ body {
   .input-field-two {
     grid-template-columns: 1fr;
   }
+}
+
+
+.quote {
+  text-align: center;
+  color: white;
+  margin-bottom: 30px;
+  max-width: 700px;
+}
+
+.quote h1 {
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.quote p {
+  font-size: 16px;
+  opacity: 0.9;
 }
