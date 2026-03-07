@@ -9,6 +9,7 @@ import MyProperties from "./pages/MyProperties";
 import WishlistPage from "./pages/WishlistPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
+import VerifyOtpPage from "./pages/VerifyOtpPage";
 // import HostApplicationPage from "./pages/HostApplicationPage";
 import TestPage from "./pages/TestPage";
 import { Outlet } from "react-router-dom";
@@ -23,6 +24,7 @@ function App(){
             <Route path="/" element={<Navigate to="/home" replace />} />
              <Route path= "/home" element= {<HomePage/>}/>
              <Route path= "/register" element= {<RegisterPage/>}/>
+             <Route path="/verify-otp" element={<VerifyOtpPage/>}/>
              <Route path= "/login" element= {<LoginPage/>}/>
              <Route path= "/profile" element= {<ProfilePage/>}/>
              <Route path= "/my-properties" element= {<MyProperties/>}/>
