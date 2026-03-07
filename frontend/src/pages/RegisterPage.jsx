@@ -49,8 +49,8 @@ function RegisterPage(){
       try {
         setLoading(true);
         await api.post("/auth/register/", payload);
-        toast.success("Registration successful! Please login.");
-        navigate("/login");
+        toast.success("Registration successful! Please verify OTP.");
+        navigate("/verify-otp", {state: {email:Form.email}});
       } catch (err){
         const msg = err?.response?.data?.details ||
         (typeof err?.response?.data === "string" ? err.response.data : null) || "Registration failed. Please try again.";
