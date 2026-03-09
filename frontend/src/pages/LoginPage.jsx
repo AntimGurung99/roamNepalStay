@@ -1,103 +1,117 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "../styles/login.css"; 
+import React, {useState} from "react";
+import {Link, useNavigate} from "react-router-dom";
+import api from "../api/axios";
+import "../styles/login.css";
 
-const API_BASE = "http://127.0.0.1:8000";
-
-export default function LoginPage() {
+function LoginPage(){
   const navigate = useNavigate();
+  const [form, setForm] = useState({
+    email:"",
+    password:""});
 
-  const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const onChange= (e) =>{
+    const {name, value} = e.target;
+    setForm((prev) => ({...prev, 
+      [name]: value
+    }))
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setErrors({}); // reset errors before making the request
+    setErrors({});
 
-    // email raw password rakhda valid xa ki nai herni 
-    if (!form.email.trim()) return setErrors({ email: "Email is required" });
-    if (!form.password) return setErrors({ password: "Password is required" });
+    const cleanEmail = form.email.trim().toLowerCase();
 
-    try {
-      setLoading(true); // request suru huda loading true garne
+    if (!cleanEmail) {
+      setErrors({email: "Email is required."})
+      return;
 
-      const resp = await fetch(`${API_BASE}/api/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      const data = await resp.json().catch(() => null);
-      if (!resp.ok) {
-      if (resp.status === 401) {
-        setErrors({ general: "Invalid username or password." });
-      } else if (resp.status === 403) {
-        setErrors({ general: "Account is disabled. Contact support." });
-      } else {
-        setErrors({ general: data?.detail || "Login failed. Please try again." });
-      }
+    }
+    if (!form.password){
+      setErrors({password: "Password is required."})
       return;
     }
 
+    try {
+      setLoading(true);
 
-      // SAVE USER DATA & REDIRECT LOGIC:
-      // We store the tokens and user profile in localStorage. 
-      // The user object contains 'is_staff' which determines their access level.
-      localStorage.setItem('access', data.access);
-      localStorage.setItem('refresh', data.refresh);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // REDIRECT BASED ON STAFF STATUS:
-      // If the user has staff privileges (is_staff=True), we send them to the Admin Dashboard.
-      // If they are a regular user (is_staff=False), we send them to the Home Page.
-      if (data.user.is_staff || data.user.is_superuser) {
+      const resp = await api.post ("/auth/login",{
+        email: cleanEmail,
+        password: form.password,
+      });
+
+      const data = resp.data;
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refesh", data.refresh);
+      localStorage.setItem("user",JSON.stringify(data.user));
+
+      if (data.user?.is_staff || data.user?.is_superuser){
         navigate("/admin");
-      } else {
+      }
+      else {
         navigate("/");
       }
-    } catch {
-      setErrors({ general: "Network error. Is backend running?" });
-    } finally {
+    } catch(err){
+      const data = err?.response?.data;
+      if (data?.email){
+        setErrors({
+          email: Array.isArray(data.email) ?data.email[0] : data.email
+        });
+      } else if (data?.password){
+        setErrors ({
+          password: Array.isArray(data.password) ? data.password[0] : data.password, 
+        });
+      }else {
+        setErrors({
+          general: 
+          data?.detail ||
+          data?.details ||
+          "Login failed. Please try again.",
+        });
+      }
+    } finally{
       setLoading(false);
     }
   };
-
   return (
-    <div className="login-wrapper">
+    <div className="login-full-container">
       <form className="login-card" onSubmit={onSubmit}>
-        <h2 className="login-title">LOG IN</h2>
+        <h2 className="login-title"> Log In</h2>
 
         {errors.general && <p className="error-text">{errors.general}</p>}
-
         <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={onChange}
+        type="email"
+        name="email"
+        placeholder="Enter you Email"
+        value={form.email}
+        onChange={onChange}
         />
+
         {errors.email && <small className="error-text">{errors.email}</small>}
 
         <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={onChange}
+        type="password"
+        name= "password"
+        placeholder="password"
+        value={form.password}
+        onChange={onChange}
         />
+
         {errors.password && <small className="error-text">{errors.password}</small>}
+       
+       <button type="submit" className="login-btn" disabled = {loading}>
+        {loading ? "Logging in.....": "LOG IN"}
+       </button>
 
-        <button disabled={loading} type="submit" className="login-btn">
-          {loading ? "Logging in..." : "LOG IN"}
-        </button>
-
-        <p className="login-footer">
-          Don’t have an account? <Link to="/register">Register Here</Link>
-        </p>
+       <p className="login-footer">
+        Don't have an account? <Link to="/register">Register Here</Link>
+       </p>
       </form>
-    </div>
+      </div>
   );
 }
+export default LoginPage;
