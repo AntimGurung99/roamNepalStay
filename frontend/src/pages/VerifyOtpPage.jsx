@@ -40,7 +40,7 @@ const onVerify = async (e) => {
 
   try{
     setLoading(true);
-    await api.post("/auth/verify-otp",{
+    await api.post("/auth/verify-otp/",{
       email: cleanEmail,
       otp : cleanOtp,
     });
