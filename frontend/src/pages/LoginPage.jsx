@@ -1,117 +1,129 @@
-import React, {useState} from "react";
-import {Link, useNavigate} from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import "../styles/login.css";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
-function LoginPage(){
+export default function LoginPage() {
   const navigate = useNavigate();
+
   const [form, setForm] = useState({
-    email:"",
-    password:""});
+    email: "",
+    password: "",
+  });
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({
+    general: "",
+  });
+
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-
-  const onChange= (e) =>{
-    const {name, value} = e.target;
-    setForm((prev) => ({...prev, 
-      [name]: value
-    }))
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
+    setErrors({ general: "" });
 
     const cleanEmail = form.email.trim().toLowerCase();
 
     if (!cleanEmail) {
-      setErrors({email: "Email is required."})
+      setErrors({ general: "Email is required." });
       return;
-
     }
-    if (!form.password){
-      setErrors({password: "Password is required."})
+
+    if (!form.password) {
+      setErrors({ general: "Password is required." });
       return;
     }
 
     try {
       setLoading(true);
 
-      const resp = await api.post ("/auth/login",{
+      const resp = await api.post("/auth/login/", {
         email: cleanEmail,
         password: form.password,
       });
 
       const data = resp.data;
-      localStorage.setItem("access", data.access);
-      localStorage.setItem("refesh", data.refresh);
-      localStorage.setItem("user",JSON.stringify(data.user));
 
-      if (data.user?.is_staff || data.user?.is_superuser){
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("user", JSON.stringify(data.user));
+    
+      if (data.user?.is_staff || data.user?.is_superuser) {
         navigate("/admin");
-      }
-      else {
+      } else {
         navigate("/");
       }
-    } catch(err){
+    } catch (err) {
+      console.log("LOGIN ERROR:", err);
+      console.log("LOGIN RESPONSE:", err?.response);
+      console.log("LOGIN DATA:", err?.response?.data);
+
       const data = err?.response?.data;
-      if (data?.email){
-        setErrors({
-          email: Array.isArray(data.email) ?data.email[0] : data.email
-        });
-      } else if (data?.password){
-        setErrors ({
-          password: Array.isArray(data.password) ? data.password[0] : data.password, 
-        });
-      }else {
-        setErrors({
-          general: 
+
+      setErrors({
+        general:
           data?.detail ||
           data?.details ||
+          data?.message ||
+          data?.email?.[0] ||
+          data?.password?.[0] ||
+          err?.message ||
           "Login failed. Please try again.",
-        });
-      }
-    } finally{
+      });
+    } finally {
       setLoading(false);
     }
   };
+
   return (
-    <div className="login-full-container">
+    <div className="login-wrapper">
       <form className="login-card" onSubmit={onSubmit}>
-        <h2 className="login-title"> Log In</h2>
+        <h2 className="login-title">Log In</h2>
 
-        {errors.general && <p className="error-text">{errors.general}</p>}
-        <input
-        type="email"
-        name="email"
-        placeholder="Enter you Email"
-        value={form.email}
-        onChange={onChange}
-        />
-
-        {errors.email && <small className="error-text">{errors.email}</small>}
+        <div className="error-box">{errors.general}</div>
 
         <input
-        type="password"
-        name= "password"
-        placeholder="password"
-        value={form.password}
-        onChange={onChange}
+          type="email"
+          name="email"
+          placeholder="Enter your email"
+          value={form.email}
+          onChange={onChange}
         />
 
-        {errors.password && <small className="error-text">{errors.password}</small>}
-       
-       <button type="submit" className="login-btn" disabled = {loading}>
-        {loading ? "Logging in.....": "LOG IN"}
-       </button>
+        <div className="password-field">
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={onChange}
+          />
+          <button
+            type="button"
+            className="eye-btn"
+            onClick={() => setShowPassword((prev) => !prev)}
+          >
+            {showPassword ? <FaEye/>:<FaEyeSlash/>}
+          </button>
+        </div>
 
-       <p className="login-footer">
-        Don't have an account? <Link to="/register">Register Here</Link>
-       </p>
+        <button disabled={loading} type="submit" className="login-btn">
+          {loading ? "Logging in..." : "LOG IN"}
+        </button>
+
+        <p className="login-footer">
+          Don't have an account? <Link to="/register">Register Here</Link>
+        </p>
       </form>
-      </div>
+    </div>
   );
 }
-export default LoginPage;
