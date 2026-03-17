@@ -52,15 +52,23 @@ export default function LoginPage() {
       });
 
       const data = resp.data;
+      const user = data.user;
 
+      // Save JWT tokens and user in localStorage
       localStorage.setItem("access", data.access);
       localStorage.setItem("refresh", data.refresh);
-      localStorage.setItem("user", JSON.stringify(data.user));
-    
-      if (data.user?.is_staff || data.user?.is_superuser) {
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // Navigation logic
+      if (user.is_superuser || user.is_staff) {
+        // Admin dashboard
         navigate("/admin");
-      } else {
+      } else if (user.is_email_verified) {
+        // Verified normal user
         navigate("/");
+      } else {
+        // Unverified user
+        navigate("/verify-otp");
       }
     } catch (err) {
       console.log("LOGIN ERROR:", err);
@@ -68,7 +76,7 @@ export default function LoginPage() {
       console.log("LOGIN DATA:", err?.response?.data);
 
       const data = err?.response?.data;
-
+    
       setErrors({
         general:
           data?.detail ||
@@ -112,7 +120,7 @@ export default function LoginPage() {
             className="eye-btn"
             onClick={() => setShowPassword((prev) => !prev)}
           >
-            {showPassword ? <FaEye/>:<FaEyeSlash/>}
+            {showPassword ? <FaEye /> : <FaEyeSlash />}
           </button>
         </div>
 
