@@ -218,7 +218,7 @@ return (
                       <button
                         className="nav__dropItem"
                         onClick={handleLogout}
-                          >
+                       >
                         Log Out
                       </button>
                     </>
