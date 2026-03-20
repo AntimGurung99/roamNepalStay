@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import '../styles/ListingsGrid.css';
 import ListingDetailModal from '../components/ListingDetailModal';
+import { FaHeart } from "react-icons/fa";
 
 const WishlistPage = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
@@ -102,7 +103,9 @@ const WishlistPage = () => {
                     </div>
                 ) : (
                     <div className="no-listings" style={{ textAlign: 'center', padding: '100px 0' }}>
-                        <div style={{ fontSize: '64px', marginBottom: '20px' }}>💝</div>
+                        <div style={{ fontSize: '64px', marginBottom: '20px', color: 'red' }}>
+                        <FaHeart />
+                        </div>
                         <h2>Your wishlist is empty</h2>
                         <p>Save properties you like so you can easily find them later.</p>
                         <button 

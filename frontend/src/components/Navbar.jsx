@@ -6,7 +6,7 @@ import logo from "../assets/mainlogo.jpg";
 import HostApplicationModal from "./HostApplicationModal";
 import CreateListingModal from "./CreateListingModal";
 import ProfileIcon from "../pages/ProfileIcon";
-
+import { RxHamburgerMenu } from "react-icons/rx";
 
 function Navbar() {
   const [open, setOpen] = useState(false);
@@ -170,7 +170,9 @@ return (
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
               >
-                <span className="nav__hamburger">MENU</span>
+                <span className="nav__hamburger">
+    <RxHamburgerMenu />
+  </span>
               </button>
 
               {open && (
@@ -181,12 +183,12 @@ return (
                         Hello, {user.first_name || user.email}
                       </div>
 
-                      <button
+                      {/* <button
                         className="nav__dropItem"
                         onClick={() => go("/profile")}
                       >
                         Profile
-                      </button>
+                      </button> */}
 
                       {user.is_host && (
                         <button
@@ -225,7 +227,7 @@ return (
                   ) : (
                     <>
                       <button
-                        className="nav__dropItem"
+                        className="nav__dropItem nav__dropItem--accent"
                         onClick={() => go("/login")}
                       >
                         Log In

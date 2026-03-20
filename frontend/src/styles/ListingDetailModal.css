@@ -20,14 +20,11 @@
   align-items: center;
   justify-content: center;
   z-index: 200000 !important;
-  /* Extremely high to overcome any conflict */
-  /* Ensure it's above everything */
   padding: 20px;
   backdrop-filter: blur(4px) !important;
   animation: modalFadeIn 0.25s ease-out;
 }
 
-/* Specific overlay for the listing detail to ensure no conflict */
 .listing-detail-modal-overlay {
   z-index: 210000 !important;
 }
@@ -75,7 +72,6 @@
   max-height: 95vh;
   border-radius: 12px;
   overflow-y: auto !important;
-  /* Allow body scroll for modal */
   background: white;
   position: relative;
   box-shadow: var(--shadow-premium);
@@ -94,11 +90,14 @@
   }
 }
 
+/* ✅ FIXED: position:fixed pins the button to the viewport.
+   It will never scroll away regardless of modal scroll position.
+   z-index: 300000 ensures it stays above the modal overlay. */
 .modal-close-x {
-  position: sticky;
+  position: fixed;
   top: 24px;
-  left: calc(100% - 68px);
-  z-index: 1001;
+  right: 24px;
+  z-index: 300000;
   background: white;
   width: 40px;
   height: 40px;
@@ -107,21 +106,23 @@
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 1px solid #ddd;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: -40px;
-  /* Offset sticky position */
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .modal-close-x:hover {
   background: var(--bg-light);
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* Image Carousel - More Integrated */
+.modal-close-x:active {
+  transform: scale(0.95);
+}
+
+/* Image Carousel */
 .listing-detail-carousel {
   position: relative;
   width: 100%;
@@ -251,7 +252,7 @@
   color: var(--text-light);
 }
 
-/* Section Refinement */
+/* Sections */
 .detail-section {
   padding-bottom: 32px;
   margin-bottom: 32px;
@@ -330,7 +331,7 @@
   white-space: pre-line;
 }
 
-/* Amenities Premium */
+/* Amenities */
 .amenities-grid-premium {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -349,7 +350,7 @@
   font-size: 20px;
 }
 
-/* Location Card Premium */
+/* Location Card */
 .location-card-premium {
   display: flex;
   align-items: center;
@@ -382,7 +383,7 @@
   color: var(--text-light);
 }
 
-/* Sidebar / Booking Card - Sticky */
+/* Booking Card */
 .booking-sticky-card {
   position: sticky;
   top: 48px;
@@ -499,11 +500,6 @@
     grid-template-columns: 1fr;
     gap: 40px;
   }
-
-  .listing-detail-sidebar {
-    order: -1;
-    /* Move booking card up on mobile? Or hidden and use footer bar */
-  }
 }
 
 @media (max-width: 768px) {
@@ -523,5 +519,13 @@
 
   .listing-detail-carousel {
     height: 350px;
+  }
+
+  .modal-close-x {
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
   }
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import CreateListingModal from '../components/CreateListingModal';
-import '../styles/profile.css';
+import '../styles/profilePage.css';
 
 const MyProperties = () => {
   const [myListings, setMyListings] = useState([]);

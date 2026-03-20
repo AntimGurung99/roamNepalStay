@@ -1,35 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from "react";
+import "../styles/ProfileIcon.css";
 
-const ProfileIcon = () => {
-  const [user, setUser] = useState(null);
+function ProfileIcon({ user }) {
+  const [imgError, setImgError] = useState(false);
 
-  // On page load, check if user info exists in localStorage
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    if (storedUser) {
-      setUser(storedUser);
-    }
-  }, []);
+  // Field is profile_image (not profile_picture)
+  const rawUrl = user?.profile_image || null;
+
+  // Build full URL: if it's already absolute (starts with http), use as-is;
+  // otherwise prepend the backend base URL for relative /media/... paths
+  const imageUrl =
+    rawUrl && !imgError
+      ? rawUrl.startsWith("http")
+        ? rawUrl
+        : `http://127.0.0.1:8000${rawUrl}`
+      : null;
+
+  const initial = user?.first_name
+    ? user.first_name.charAt(0).toUpperCase()
+    : user?.email?.charAt(0).toUpperCase();
 
   return (
-    <div className="profile-icon">
-      {user ? (
-        <div>
-          <p>Welcome, {user.first_name} {user.last_name}</p>
-          <button onClick={handleLogout}>Logout</button>
-        </div>
+    <div className="profileIconContainer">
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt="profile"
+          className="profileImage"
+          onError={() => setImgError(true)}
+        />
       ) : (
-        <p>Please log in</p>
+        <div className="profileInitial">{initial}</div>
       )}
     </div>
   );
-};
-
-const handleLogout = () => {
-  localStorage.removeItem('user');
-  localStorage.removeItem('access');
-  localStorage.removeItem('refresh');
-  window.location.href = '/login'; // Redirect to login page after logout
-};
+}
 
 export default ProfileIcon;

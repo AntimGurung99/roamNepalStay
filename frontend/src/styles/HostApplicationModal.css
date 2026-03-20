@@ -54,7 +54,7 @@
 
 .modal-close:hover {
   background: #e5e7eb;
-  transform: rotate(90deg);
+  /* transform: rotate(90deg); */
 }
 
 .modal-header {
