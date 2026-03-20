@@ -10,7 +10,40 @@ const ProfilePage = () => {
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({});
 
+
+  // jaba edit user lay click garxah current user data copy garxa into formdata maa
+  const handleEditClick = () =>{
+    setFormData ({
+         first_name: user.first_name || "",
+         last_name : user.last_name || "",
+         phone_number: user.phone_number || "",
+         city: user.city || "",
+         country: user.country || "",
+    });
+    setIsEditing(true);
+
+  };
+ 
+  const handleChange = (e) => {
+    setFormData({...formData, [e.target.name]: e.target.value})
+  };
+
+
+
+   const handleSave = async () => {
+    try {
+      const res = await api.patch("/auth/profile/",formData);
+      setUser(res.data);
+      localStorage.setItem("user", JSON.stringify(res.data));
+      setIsEditing(false);
+    } catch (err) {
+      setError(err?.response?.data?.details || "Failed to update profile.");
+    }
+   };
+   
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
 
@@ -141,12 +174,31 @@ const ProfilePage = () => {
           <div className="profile-details">
             <div className="detail-item">
               <label>First Name</label>
+              {isEditing ? (
+                <input
+                 name ="first_name"
+                value= {formData.first_name}
+                onChange={handleChange}
+                className="profile-input"
+              />
+              ) :(
+
               <span>{user.first_name || "Not provided"}</span>
+              )}
             </div>
 
             <div className="detail-item">
               <label>Last Name</label>
+               {isEditing ? (
+                <input
+                 name ="last_name"
+                value= {formData.last_name}
+                onChange={handleChange}
+                className="profile-input"
+              />
+              ) :(
               <span>{user.last_name || "Not provided"}</span>
+              )}
             </div>
 
             <div className="detail-item">
@@ -156,22 +208,59 @@ const ProfilePage = () => {
 
             <div className="detail-item">
               <label>Phone Number</label>
+              {isEditing ? (
+                <input
+                 name ="phone number"
+                value= {formData.phone_number}
+                onChange={handleChange}
+                className="profile-input"
+              />
+              ) :(
               <span>{user.phone_number || "Not provided"}</span>
+              )}
             </div>
 
             <div className="detail-item">
               <label>Date of Birth</label>
+              {isEditing ? (
+                <input
+                 type="date"
+                 name ="date_of_birth"
+                 value= {formData.date_of_birth}
+                 onChange={handleChange}
+                 className="profile-input"
+              />
+              ) :(
               <span>{formatDate(user.date_of_birth)}</span>
+              )}
             </div>
 
             <div className="detail-item">
               <label>City</label>
+              {isEditing ? (
+                <input
+                 name ="city"
+                value= {formData.city}
+                onChange={handleChange}
+                className="profile-input"
+              />
+              ) :(
               <span>{user.city || "Not provided"}</span>
+              )}
             </div>
 
             <div className="detail-item">
               <label>Country</label>
+              {isEditing ? (
+                <input
+                 name ="country"
+                value= {formData.country}
+                onChange={handleChange}
+                className="profile-input"
+              />
+              ) :(
               <span>{user.country || "Not provided"}</span>
+              )}
             </div>
 
             <div className="detail-item">
@@ -203,8 +292,17 @@ const ProfilePage = () => {
               <span className="status-badge active">Active</span>
             </div>
           </div>
+          {isEditing ?  (
+            <div className="profile-btn-group">
+              <button className="save-profile-btn" onClick={handleSave}>Save Change</button>
+            
+            <button className="cancel-profile-btn" onClick={() => setIsEditing(false)}>Cancel</button>
 
-          <button className="edit-profile-btn">Edit Profile</button>
+          </div>
+          ):(
+            <button className="edit-profile-btn" onClick={handleEditClick}>Edit Profile</button>
+          )}
+          
         </div>
       </main>
     </div>
