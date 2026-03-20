@@ -91,8 +91,7 @@ class UserAdmin(BaseUserAdmin):
                     "date_of_birth",
                     "profile_image",
                     "accepted_terms",
-
-                    #host/admin flags
+                    # host/admin flags
                     "is_host",
                     "host_application_status",
                     "is_staff",
@@ -154,17 +153,29 @@ class ListingAdmin(admin.ModelAdmin):
 class BookingAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "listing",
-        "guest",
+        "get_listing_title",
+        "get_guest_name",
         "check_in",
         "check_out",
+        "payment_status" ,
         "total_amount",
         "status",
+        "created_at",
     )
     list_filter = ("status", "check_in", "check_out")
     search_fields = ("listing__title", "guest__email", "id")
     date_hierarchy = "check_in"
     list_editable = ("status",)
+
+    def get_listing_title(self, obj):
+        return obj.listing.title
+
+    get_listing_title.short_description = "Listing"
+
+    def get_guest_name(self, obj):
+        return f"{obj.guest.first_name} {obj.guest.last_name}"
+
+    get_guest_name.short_description = "Guest"
 
 
 # Review Admin
