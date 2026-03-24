@@ -69,19 +69,6 @@ class User(AbstractUser):
     accepted_terms = models.BooleanField(default=False)
     accepted_terms_at = models.DateTimeField(null=True, blank=True)
 
-    # class Meta:
-    #     email = models.EmailField(unique=True)
-    # constraints = [
-    #     models.CheckConstraint(
-    #         condition=~Q(first_name="") & ~Q(last_name=""),
-    #         name="first_last_not_empty",
-    #     ),
-    #     UniqueConstraint(
-    #         Lower("first_name"),
-    #         Lower("last_name"),
-    #         name="uniq_first_last_case_insensitive",
-    #     ),
-    # ]
     # Email verification (OTP)
     is_email_verified = models.BooleanField(default=False)
     email_otp = models.CharField(max_length=6, blank=True, null=True)
@@ -91,6 +78,30 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
     objects = UserManager()
+
+    def __str__(self):
+        return self.email
+
+
+from django.db import models
+from django.utils import timezone
+
+
+class PendingRegistration(models.Model):
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    profile_image = models.ImageField(upload_to="profiles/", blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    accepted_terms = models.BooleanField(default=False)
+
+    email_otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return self.email
@@ -287,12 +298,62 @@ class ListingImage(models.Model):
 
 
 # sabai booking details haru store garna hunxa
+# class Booking(models.Model):
+#     class Status(models.TextChoices):
+#         PENDING = "pending", "Pending"
+#         CONFIRMED = "confirmed", "Confirmed"
+#         CANCELLED = "cancelled", "Cancelled"
+#         COMPLETED = "completed", "Completed"
+
+#     # Booking parties
+#     guest = models.ForeignKey(
+#         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
+#     )
+#     listing = models.ForeignKey(
+#         Listing, on_delete=models.CASCADE, related_name="bookings"
+#     )
+
+#     # Booking details
+#     check_in = models.DateField()
+#     check_out = models.DateField()
+#     guests_count = models.PositiveIntegerField()
+
+#     # Pricing
+#     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+#     cleaning_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+#     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+
+#     # Status
+#     status = models.CharField(
+#         max_length=20, choices=Status.choices, default=Status.PENDING
+#     )
+
+#     # Special requests
+#     special_requests = models.TextField(blank=True)
+
+#     # Timestamps
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     def __str__(self):
+#         return f"Booking {self.id} - {self.listing.title}"
+
+#     class Meta:
+#         ordering = ["-created_at"]
+
+
 class Booking(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         CONFIRMED = "confirmed", "Confirmed"
+        PAID = "paid", "Paid"
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
+
+    class PaymentStatus(models.TextChoices):
+        UNPAID = "unpaid", "Unpaid"
+        PAID = "paid", "Paid"
+        FAILED = "failed", "Failed"
 
     # Booking parties
     guest = models.ForeignKey(
@@ -301,15 +362,15 @@ class Booking(models.Model):
     listing = models.ForeignKey(
         Listing, on_delete=models.CASCADE, related_name="bookings"
     )
-
     # Booking details
     check_in = models.DateField()
     check_out = models.DateField()
     guests_count = models.PositiveIntegerField()
+    special_requests = models.TextField(blank=True)
 
     # Pricing
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    cleaning_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 
     # Status
@@ -317,15 +378,29 @@ class Booking(models.Model):
         max_length=20, choices=Status.choices, default=Status.PENDING
     )
 
-    # Special requests
-    special_requests = models.TextField(blank=True)
+    # new payment for track ganruh
+    payment_status = models.CharField(
+        max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID
+    )
 
-    # Timestamps
+    khalti_token = models.CharField(max_length=255, blank=True, null=True)
+    khalti_transaction_id = models.CharField(max_length=255, blank=True, null=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    # host ko response track garnih
+    host_responded_at = models.DateTimeField(null=True, blank=True)
+    host_rejection_reasons = models.TextField(blank=True)
+
+    # Timestamp
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Booking {self.id} - {self.listing.title}"
+        return f"Booking {self.id} - {self.Listing.title}"
+
+    @property
+    def total_nights(self):
+        return (self.check_out - self.check_in).days
 
     class Meta:
         ordering = ["-created_at"]
