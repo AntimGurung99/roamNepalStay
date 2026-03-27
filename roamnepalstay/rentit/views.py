@@ -1,36 +1,50 @@
-from rest_framework import status
+from decimal import Decimal
+import requests
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import Avg, Count, Q, Sum
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from django.db.models import Count, Sum, Q, Avg
-from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import (
+    Booking,
+    HostApplication,
+    Listing,
+    ListingImage,
+    PendingRegistration,
+    Review,
+    Wishlist,
+)
+from .permissions import IsAdminUserRole
 from .serializers import (
-    RegisterSerializer,
-    RegisterResponseSerializer,
-    LoginSerializer,
-    # Admin site ko serializers
-    UserListSerializer,
-    UserDetailSerializer,
-    HostApplicationSerializer,
-    ListingListSerializer,
-    ListingDetailSerializer,
-    BookingListSerializer,
-    ReviewListSerializer,
     AdminStatsSerializer,
+    BookingCreateSerializer,
+    BookingDetailSerializer,
+    BookingListSerializer,
+    HostApplicationSerializer,
     ListingCreateSerializer,
+    ListingDetailSerializer,
+    ListingListSerializer,
+    LoginSerializer,
+    ProfileSerializer,
+    RegisterResponseSerializer,
+    RegisterSerializer,
+    ResendOTPSerializer,
+    ReviewListSerializer,
+    UserDetailSerializer,
+    UserListSerializer,
+    VerifyOTPSerializer,
     WishlistSerializer,
 )
-from .models import Listing, ListingImage, HostApplication, Booking, Review, Wishlist
-from rest_framework import viewsets, permissions
-from .permissions import IsAdminUserRole
-from .utils import send_otp_email
-from .serializers import VerifyOTPSerializer, ResendOTPSerializer
-
+from .utils import generate_otp, send_otp_email
 
 User = get_user_model()
 
@@ -42,28 +56,52 @@ class RegisterAPIView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = serializer.save()
-        try:
-            send_otp_email(user)
-            otp_sent = True
-        except Exception:
-            otp_sent = False
-        user_data = RegisterResponseSerializer(user).data
+        data = serializer.validated_data
+        email = data["email"].lower()
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"detail": "Email already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if PendingRegistration.objects.filter(email__iexact=email).exists():
+            PendingRegistration.objects.filter(email__iexact=email).delete()
+
+        otp = generate_otp()
+
+        pending_user = PendingRegistration.objects.create(
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            email=data["email"],
+            password=data["password"],
+            phone_number=data.get("phone_number"),
+            profile_image=data.get("profile_image"),
+            date_of_birth=data.get("date_of_birth"),
+            city=data.get("city"),
+            country=data.get("country"),
+            accepted_terms=data.get("accepted_terms"),
+            email_otp=otp,
+            otp_created_at=timezone.now(),
+        )
+
+        send_mail(
+            subject="RoamNepalStay - Verify your email",
+            message=f"Your OTP code is: {otp}\nThis code expires in 10 minutes.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[pending_user.email],
+            fail_silently=False,
+        )
 
         return Response(
-            {
-                "detail": (
-                    "Registered successfully. OTP sent to your email. Please verify."
-                    if otp_sent
-                    else "Registered successfully, but OTP could not be sent. Please try resend OTP."
-                ),
-                "user": user_data,
-            },
-            status=status.HTTP_201_CREATED,
+            {"detail": "OTP sent to your email. Please verify."},
+            status=status.HTTP_200_OK,
         )
 
 
 class VerifyOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -72,38 +110,60 @@ class VerifyOTPAPIView(APIView):
         otp = serializer.validated_data["otp"].strip()
 
         try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
+            pending_user = PendingRegistration.objects.get(email__iexact=email)
+        except PendingRegistration.DoesNotExist:
             return Response(
-                {"details": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "No pending registration found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        if user.is_email_verified:
+
+        if not pending_user.email_otp or pending_user.email_otp != otp:
             return Response(
-                {"details": "Email already verified."}, status=status.HTTP_200_OK
-            )
-        if not user.email_otp or user.email_otp != otp:
-            return Response(
-                {"details": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        # OPT EXPIRY TIME 10 MINUTES
-        if (
-            user.otp_created_at
-            and (timezone.now() - user.otp_created_at).total_seconds() > 600
-        ):
-            return Response(
-                {"detials": "OTP exired. Please request a new one."},
+                {"detail": "Invalid OTP."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        user.is_email_verified = True
-        user.email_otp = None
-        user.save(update_fields=["is_email_verified", "email_otp"])
+
+        if (
+            pending_user.otp_created_at
+            and (timezone.now() - pending_user.otp_created_at).total_seconds() > 600
+        ):
+            return Response(
+                {"detail": "OTP expired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(email__iexact=email).exists():
+            pending_user.delete()
+            return Response(
+                {"detail": "User already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.create_user(
+            email=pending_user.email,
+            password=pending_user.password,
+            first_name=pending_user.first_name,
+            last_name=pending_user.last_name,
+            phone_number=pending_user.phone_number,
+            profile_image=pending_user.profile_image,
+            date_of_birth=pending_user.date_of_birth,
+            city=pending_user.city,
+            country=pending_user.country,
+            accepted_terms=pending_user.accepted_terms,
+            is_email_verified=True,
+        )
+
+        pending_user.delete()
 
         return Response(
-            {"details": "Email verified successfully."}, status=status.HTTP_200_OK
+            {"detail": "Email verified and account created successfully."},
+            status=status.HTTP_201_CREATED,
         )
 
 
 class ResendOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = ResendOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -111,40 +171,38 @@ class ResendOTPAPIView(APIView):
         email = serializer.validated_data["email"].strip().lower()
 
         try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
+            pending_user = PendingRegistration.objects.get(email__iexact=email)
+        except PendingRegistration.DoesNotExist:
             return Response(
-                {"details": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "No pending registration found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        if user.is_email_verified:
-            return Response(
-                {"details": "Email already verified."}, status=status.HTTP_200_OK
-            )
-        send_otp_email(user)
+
+        send_otp_email(pending_user)
+
         return Response(
-            {"details": "OTP resent successfully."}, status=status.HTTP_200_OK
+            {"detail": "OTP resent successfully."},
+            status=status.HTTP_200_OK,
         )
 
 
-# yeslay current user ko profile data return garcha raw host status refresh garna ko lagii admin le approve garepachi
-class UserProfileView(APIView):
+class ProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        return Response(
-            {
-                "id": user.id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
-                "is_host": user.is_host,
-                "host_application_status": user.host_application_status,
-                "wishlist_count": user.wishlist.count(),
-            }
+        serializer = ProfileSerializer(request.user, context={"request": request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(
+            request.user, data=request.data, partial=True, context={"request": request}
         )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginAPIView(APIView):
@@ -154,7 +212,7 @@ class LoginAPIView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = serializer.validated_data["user"]
+        user = serializer.validated_data["user"]  # email & password validated
 
         if not user.is_active:
             return Response(
@@ -162,10 +220,16 @@ class LoginAPIView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Create JWT tokens
+        # Superuser or staff can login without email verification
+        if not (user.is_staff or user.is_superuser or user.is_email_verified):
+            return Response(
+                {"detail": "Email not verified. Please verify your email."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
-        # user detials sanga tokens return garne
         return Response(
             {
                 "message": "Login successful",
@@ -179,6 +243,7 @@ class LoginAPIView(APIView):
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
                     "is_host": user.is_host,
+                    "is_email_verified": user.is_email_verified,
                     "host_application_status": user.host_application_status,
                 },
             },
@@ -186,30 +251,21 @@ class LoginAPIView(APIView):
         )
 
 
-# admin dashboard overview ko lagii
-
-
 class AdminDashboardViewSet(GenericViewSet):
-    permission_classes = [
-        IsAuthenticated,
-        IsAdminUserRole,
-    ]  # koslay paunay admin dashboard overviews herna
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
 
     @action(detail=False, methods=["get"])
-    def stats(self, request):  # Shows main dashboard statistics
-
+    def stats(self, request):
         total_users = User.objects.count()
         total_hosts = User.objects.filter(is_host=True).count()
         total_listings = Listing.objects.count()
         total_bookings = Booking.objects.count()
 
-        pending_host_applications = HostApplication.objects.filter(
-            status="pending"
-        ).count()
+        pending_host_applications = HostApplication.objects.filter(status="pending").count()
         pending_listings = Listing.objects.filter(status="pending").count()
 
         total_revenue = (
-            Booking.objects.filter(status__in=["confirmed", "completed"]).aggregate(
+            Booking.objects.filter(status__in=["confirmed", "paid", "completed"]).aggregate(
                 total=Sum("total_amount")
             )["total"]
             or 0
@@ -223,7 +279,6 @@ class AdminDashboardViewSet(GenericViewSet):
             "-created_at"
         )[:5]
 
-        # serializer prayog garey ko data sajilo sanga handle garna ko lagii, data dictionary ma store garey
         stats_data = {
             "total_users": total_users,
             "total_hosts": total_hosts,
@@ -237,18 +292,16 @@ class AdminDashboardViewSet(GenericViewSet):
         }
 
         serializer = AdminStatsSerializer(stats_data)
-        return Response(serializer.data)  # JSON format mah pathako frotend mah
+        return Response(serializer.data)
 
 
-# admin dashboard me user manage garnih kasari vanda name, email, role lay search gaari
 class AdminUserViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
     queryset = User.objects.all()
 
-    def list(self, request):  # sabai users ko list dekhaucha
+    def list(self, request):
         users = (
-            User.objects.select_related()
-            .annotate(
+            User.objects.annotate(
                 total_listings=Count("listings", distinct=True),
                 total_bookings=Count("bookings", distinct=True),
             )
@@ -272,92 +325,71 @@ class AdminUserViewSet(GenericViewSet):
         serializer = UserListSerializer(users, many=True)
         return Response(serializer.data)
 
-    def retrieve(self, request, pk=None):  # single user full details dekhaucha
+    def retrieve(self, request, pk=None):
         try:
             user = User.objects.get(pk=pk)
             serializer = UserDetailSerializer(user)
             return Response(serializer.data)
         except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    @action(detail=True, methods=["post"])  # user active/inactive status
+    @action(detail=True, methods=["post"])
     def toggle_active(self, request, pk=None):
         try:
             user = User.objects.get(pk=pk)
             user.is_active = not user.is_active
             user.save()
-
             return Response(
                 {
-                    "message": f'User {"activated" if user.is_active else "deactivated"} successfully',
+                    "detail": f'User {"activated" if user.is_active else "deactivated"} successfully',
                     "is_active": user.is_active,
                 }
             )
         except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def make_staff(self, request, pk=None):
         try:
             if not request.user.is_superuser:
                 return Response(
-                    {"error": "Only super admins can manage staff roles."},
+                    {"detail": "Only super admins can manage staff roles."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             user = User.objects.get(pk=pk)
             user.is_staff = True
             user.save()
-
-            return Response(
-                {"message": "User made staff successfully", "is_staff": user.is_staff}
-            )
+            return Response({"detail": "User made staff successfully.", "is_staff": user.is_staff})
         except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def remove_staff(self, request, pk=None):
         try:
             if not request.user.is_superuser:
                 return Response(
-                    {"error": "Only super admins can manage staff roles."},
+                    {"detail": "Only super admins can manage staff roles."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             user = User.objects.get(pk=pk)
             user.is_staff = False
             user.save()
-
             return Response(
-                {
-                    "message": "User staff status removed successfully",
-                    "is_staff": user.is_staff,
-                }
+                {"detail": "User staff status removed successfully.", "is_staff": user.is_staff}
             )
         except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-# For managing host applications
 class AdminHostApplicationViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
     queryset = HostApplication.objects.all()
 
     def list(self, request):
-        applications = HostApplication.objects.select_related("user").order_by(
-            "-applied_at"
-        )
-
+        applications = HostApplication.objects.select_related("user").order_by("-applied_at")
         status_filter = request.query_params.get("status", "")
         if status_filter:
             applications = applications.filter(status=status_filter)
-
         serializer = HostApplicationSerializer(applications, many=True)
         return Response(serializer.data)
 
@@ -368,10 +400,9 @@ class AdminHostApplicationViewSet(GenericViewSet):
             return Response(serializer.data)
         except HostApplication.DoesNotExist:
             return Response(
-                {"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-    # To approve or reject host applications
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         try:
@@ -382,16 +413,14 @@ class AdminHostApplicationViewSet(GenericViewSet):
             application.review_notes = request.data.get("notes", "")
             application.save()
 
-            # UPDATE USER STATUS
             user = application.user
             user.is_host = True
             user.host_application_status = "approved"
             user.save()
-
-            return Response({"message": "Host application approved successfully"})
+            return Response({"detail": "Host application approved successfully."})
         except HostApplication.DoesNotExist:
             return Response(
-                {"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
     @action(detail=True, methods=["post"])
@@ -404,19 +433,16 @@ class AdminHostApplicationViewSet(GenericViewSet):
             application.review_notes = request.data.get("notes", "Application rejected")
             application.save()
 
-            # Update user status
             user = application.user
             user.host_application_status = "rejected"
             user.save()
-
-            return Response({"message": "Host application rejected successfully"})
+            return Response({"detail": "Host application rejected successfully."})
         except HostApplication.DoesNotExist:
             return Response(
-                {"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
 
-# For managing listings
 class AdminListingViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
     queryset = Listing.objects.all()
@@ -425,9 +451,7 @@ class AdminListingViewSet(GenericViewSet):
         listings = (
             Listing.objects.select_related("host")
             .prefetch_related("images", "bookings", "reviews")
-            .annotate(
-                total_bookings=Count("bookings"), average_rating=Avg("reviews__rating")
-            )
+            .annotate(total_bookings=Count("bookings"), average_rating=Avg("reviews__rating"))
             .order_by("-created_at")
         )
         search = request.query_params.get("search", "")
@@ -437,35 +461,19 @@ class AdminListingViewSet(GenericViewSet):
                 | Q(city__icontains=search)
                 | Q(district__icontains=search)
             )
-
         status_filter = request.query_params.get("status", "")
         if status_filter:
             listings = listings.filter(status=status_filter)
-
         serializer = ListingListSerializer(listings, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         try:
-            listing = (
-                Listing.objects.select_related("host", "moderated_by")
-                .prefetch_related("images")
-                .get(pk=pk)
-            )
+            listing = Listing.objects.select_related("host", "moderated_by").prefetch_related("images").get(pk=pk)
             serializer = ListingDetailSerializer(listing, context={"request": request})
             return Response(serializer.data)
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            import traceback
-
-            print(f"DEBUG: Error in AdminListingViewSet.retrieve: {str(e)}")
-            traceback.print_exc()
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
@@ -476,12 +484,9 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Approved by admin")
             listing.save()
-
-            return Response({"message": "Listing approved successfully"})
+            return Response({"detail": "Listing approved successfully."})
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
@@ -492,12 +497,9 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Rejected by admin")
             listing.save()
-
-            return Response({"message": "Listing rejected successfully"})
+            return Response({"detail": "Listing rejected successfully."})
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def suspend(self, request, pk=None):
@@ -508,52 +510,35 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Suspended by admin")
             listing.save()
-
-            return Response({"message": "Listing suspended successfully"})
+            return Response({"detail": "Listing suspended successfully."})
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-# For managing bookings
 class AdminBookingViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
     queryset = Booking.objects.all()
 
     def list(self, request):
-        bookings = Booking.objects.select_related(
-            "guest", "listing", "listing__host"
-        ).order_by("-created_at")
-
-        # Filter by status
+        bookings = Booking.objects.select_related("guest", "listing", "listing__host").order_by("-created_at")
         status_filter = request.query_params.get("status", "")
         if status_filter:
             bookings = bookings.filter(status=status_filter)
-
-        serializer = BookingListSerializer(bookings, many=True)
+        serializer = BookingDetailSerializer(bookings, many=True, context={"request": request})
         return Response(serializer.data)
 
 
-# For managing reviews
 class AdminReviewViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
     queryset = Review.objects.all()
 
-    # Displays list of all reviews
     def list(self, request):
-
-        reviews = Review.objects.select_related(
-            "reviewer", "listing", "moderated_by"
-        ).order_by("-created_at")
-
-        # Filter by approval status
+        reviews = Review.objects.select_related("reviewer", "listing", "moderated_by").order_by("-created_at")
         approved = request.query_params.get("approved", "")
         if approved == "true":
             reviews = reviews.filter(is_approved=True)
         elif approved == "false":
             reviews = reviews.filter(is_approved=False)
-
         serializer = ReviewListSerializer(reviews, many=True)
         return Response(serializer.data)
 
@@ -564,34 +549,27 @@ class AdminReviewViewSet(GenericViewSet):
             review.is_approved = not review.is_approved
             review.moderated_by = request.user
             review.save()
-
             return Response(
                 {
-                    "message": f'Review {"approved" if review.is_approved else "disapproved"} successfully',
+                    "detail": f'Review {"approved" if review.is_approved else "disapproved"} successfully',
                     "is_approved": review.is_approved,
                 }
             )
         except Review.DoesNotExist:
-            return Response(
-                {"error": "Review not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "Review not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-# User Host Application View
 class HostApplicationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # check if already applied
         if HostApplication.objects.filter(user=request.user).exists():
             return Response(
                 {"detail": "You have already submitted an application."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         serializer = HostApplicationSerializer(data=request.data)
         if serializer.is_valid():
-            # Save application and update user status
             serializer.save(user=request.user)
             request.user.host_application_status = "pending"
             request.user.save()
@@ -608,11 +586,8 @@ class ListingViewSet(GenericViewSet):
         return [IsAuthenticated()]
 
     def list(self, request):
-        # published listings matra dekhaucha
         listings = Listing.objects.filter(status="published").order_by("-created_at")
-        serializer = ListingListSerializer(
-            listings, many=True, context={"request": request}
-        )
+        serializer = ListingListSerializer(listings, many=True, context={"request": request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -621,110 +596,242 @@ class ListingViewSet(GenericViewSet):
             serializer = ListingDetailSerializer(listing, context={"request": request})
             return Response(serializer.data)
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def create(self, request):
-        # host lay matra create garnu pauxa listing
         if not request.user.is_host:
             return Response(
-                {"detail": "You must be a host to create a listing."},
-                status=status.HTTP_403_FORBIDDEN,
+                {"detail": "You must be a host to create a listing."}, status=status.HTTP_403_FORBIDDEN
             )
-
         serializer = ListingCreateSerializer(data=request.data)
         if serializer.is_valid():
-            # suru mah pending ani approval pachi published huncha
             listing = serializer.save(host=request.user, status="pending")
-
             images = request.FILES.getlist("images")
             for i, image_file in enumerate(images):
-                ListingImage.objects.create(
-                    listing=listing,
-                    image=image_file,
-                    is_primary=(i == 0),
-                )
-
+                ListingImage.objects.create(listing=listing, image=image_file, is_primary=(i == 0))
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def partial_update(self, request, pk=None):
-        return self.update(request, pk)
 
     def update(self, request, pk=None):
         try:
             listing = Listing.objects.get(pk=pk, host=request.user)
-            serializer = ListingCreateSerializer(
-                listing, data=request.data, partial=True
-            )
+            serializer = ListingCreateSerializer(listing, data=request.data, partial=True)
             if serializer.is_valid():
-                # Any edit resets the status to pending for admin review
                 listing = serializer.save(status="pending")
-
-                # Handle new images if provided
                 if "images" in request.FILES:
                     images = request.FILES.getlist("images")
                     for image_file in images:
-                        ListingImage.objects.create(
-                            listing=listing,
-                            image=image_file,
-                            is_primary=False,
-                        )
-
+                        ListingImage.objects.create(listing=listing, image=image_file, is_primary=False)
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Listing.DoesNotExist:
-            return Response(
-                {"error": "Listing not found or you don't have permission"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def delete_image(self, request, pk=None):
         image_id = request.data.get("image_id")
         try:
-            image = ListingImage.objects.get(
-                id=image_id, listing_id=pk, listing__host=request.user
-            )
+            image = ListingImage.objects.get(id=image_id, listing_id=pk, listing__host=request.user)
             image.delete()
-            return Response({"status": "image deleted"})
+            return Response({"detail": "Image deleted successfully."})
         except ListingImage.DoesNotExist:
-            return Response(
-                {"error": "Image not found or you don't have permission"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"detail": "Image not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    @action(
-        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
-    )
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def toggle_wishlist(self, request, pk=None):
         listing = self.get_object()
         wishlist_item = Wishlist.objects.filter(user=request.user, listing=listing)
-
         if wishlist_item.exists():
             wishlist_item.delete()
-            return Response(
-                {"is_wishlisted": False, "message": "Removed from wishlist"}
-            )
+            return Response({"is_wishlisted": False, "detail": "Removed from wishlist."})
         else:
             Wishlist.objects.create(user=request.user, listing=listing)
-            return Response({"is_wishlisted": True, "message": "Added to wishlist"})
+            return Response({"is_wishlisted": True, "detail": "Added to wishlist."})
 
     @action(detail=False, methods=["get"])
     def my_listings(self, request):
-        # List of listings owned by the current host
         listings = Listing.objects.filter(host=request.user).order_by("-created_at")
-        serializer = ListingListSerializer(listings, many=True)
+        serializer = ListingListSerializer(listings, many=True, context={"request": request})
         return Response(serializer.data)
 
 
 class WishlistViewSet(viewsets.ModelViewSet):
     serializer_class = WishlistSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return Wishlist.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class BookingCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = BookingCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        listing = serializer.validated_data["listing"]
+        check_in = serializer.validated_data["check_in"]
+        check_out = serializer.validated_data["check_out"]
+
+        nights = Decimal((check_out - check_in).days)
+        price_per_night = Decimal(listing.price_per_night)
+        cleaning_fee = Decimal(listing.cleaning_fee or 0)
+        service_fee = (price_per_night * nights * Decimal("0.05")).quantize(Decimal("0.01"))
+        total_amount = (price_per_night * nights + cleaning_fee + service_fee).quantize(Decimal("0.01"))
+
+        booking = serializer.save(
+            guest=request.user,
+            total_amount=total_amount,
+            cleaning_fee=cleaning_fee,
+            service_fee=service_fee,
+            status="pending",
+            payment_status="unpaid",
+        )
+
+        try:
+            host = listing.host
+            send_mail(
+                subject=f"RoamNepalStay - New Booking for {listing.title}",
+                message=f"Hi {host.first_name},\n\nYou have a new booking for your property: {listing.title}.\n- Guest: {request.user.first_name} {request.user.last_name}\n- Dates: {check_in} to {check_out}\n- Total Amount: Rs. {total_amount}\n\nRegards,\nRoamNepalStay",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[host.email],
+                fail_silently=True,
+            )
+            send_mail(
+                subject=f"RoamNepalStay - Booking Created for {listing.title}",
+                message=f"Hi {request.user.first_name},\n\nYour booking for {listing.title} has been created successfully!\n- Dates: {check_in} to {check_out}\n- Total Amount: Rs. {total_amount}\n\nPlease proceed to payment.\n\nRegards,\nRoamNepalStay",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[request.user.email],
+                fail_silently=True,
+            )
+        except Exception as e:
+            print(f"Error sending emails: {e}")
+
+        return Response(BookingDetailSerializer(booking, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class BookingListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        bookings = Booking.objects.filter(guest=request.user).order_by("-created_at")
+        serializer = BookingDetailSerializer(bookings, many=True, context={"request": request})
+        return Response(serializer.data)
+
+
+class BookingsDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            booking = Booking.objects.get(pk=pk, guest=request.user)
+            serializer = BookingDetailSerializer(booking, context={"request": request})
+            return Response(serializer.data)
+        except Booking.DoesNotExist:
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class HostBookingViewSet(GenericViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        bookings = Booking.objects.filter(listing__host=request.user).order_by("-created_at")
+        status_filter = request.query_params.get("status", "")
+        if status_filter:
+            bookings = bookings.filter(status=status_filter)
+        serializer = BookingDetailSerializer(bookings, many=True, context={"request": request})
+        return Response(serializer.data)
+
+
+class KhaltiInitiateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, booking_id):
+        try:
+            booking = Booking.objects.get(pk=booking_id, guest=request.user)
+        except Booking.DoesNotExist:
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if booking.payment_status == "paid":
+            return Response({"detail": "This booking is already paid."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if booking.status in ["cancelled", "completed"]:
+            return Response({"detail": f"Cannot pay for a booking that is {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        amount_in_paisa = int(float(booking.total_amount) * 100)
+        payload = {
+            "return_url": "http://localhost:5173/booking/payment-success/",
+            "website_url": "http://localhost:5173",
+            "amount": amount_in_paisa,
+            "purchase_order_id": str(booking.id),
+            "purchase_order_name": f"Booking for {booking.listing.title}",
+            "customer_info": {
+                "name": f"{request.user.first_name} {request.user.last_name}",
+                "email": request.user.email,
+                "phone": request.user.phone_number or "9800000000",
+            },
+        }
+        headers = {
+            "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
+            "Content-Type": "application/json",
+        }
+        try:
+            response = requests.post(settings.KHALTI_INITIATE_URL, json=payload, headers=headers)
+            khalti_data = response.json()
+            if response.status_code == 200:
+                booking.khalti_token = khalti_data.get("pidx")
+                booking.save()
+                return Response({"payment_url": khalti_data.get("payment_url"), "pidx": khalti_data.get("pidx"), "booking_id": booking.id})
+            return Response({"detail": "Failed to initiate payment.", "khalti_details": khalti_data}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": f"Payment error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class KhaltiVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        pidx = request.data.get("pidx")
+        booking_id = request.data.get("booking_id")
+        if not pidx or not booking_id:
+            return Response({"detail": "pidx and booking_id are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            booking = Booking.objects.get(pk=booking_id, guest=request.user)
+        except Booking.DoesNotExist:
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        headers = {
+            "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
+            "Content-Type": "application/json",
+        }
+        try:
+            response = requests.post(settings.KHALTI_VERIFY_URL, json={"pidx": pidx}, headers=headers)
+            khalti_data = response.json()
+            if response.status_code == 200 and khalti_data.get("status") == "Completed":
+                booking.payment_status = "paid"
+                booking.status = "paid"
+                booking.khalti_transaction_id = khalti_data.get("transaction_id")
+                booking.paid_at = timezone.now()
+                booking.save()
+
+                # Notify host
+                host = booking.listing.host
+                send_mail(
+                    subject=f"New Paid Booking - {booking.listing.title}",
+                    message=f"Hi {host.first_name},\n\nYou have a new paid booking!\nProperty: {booking.listing.title}\nDates: {booking.check_in} to {booking.check_out}\n\nRegards,\nRoamNepalStay",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[host.email],
+                    fail_silently=True,
+                )
+                return Response({"detail": "Payment verified! Booking confirmed.", "booking": BookingDetailSerializer(booking, context={"request": request}).data})
+            booking.payment_status = "failed"
+            booking.save()
+            return Response({"detail": "Payment verification failed.", "khalti_details": khalti_data}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": f"Verification error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

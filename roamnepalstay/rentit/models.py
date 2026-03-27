@@ -39,8 +39,8 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     username = None  # username field lai hatauna
     email = models.EmailField(unique=True)
-    first_name = models.CharField(max_length=15, blank=False)
-    last_name = models.CharField(max_length=15, blank=False)
+    first_name = models.CharField(max_length=150, blank=False)
+    last_name = models.CharField(max_length=150, blank=False)
     # email = models.EmailField(unique=True)
 
     # host banna chaahnay user ko lagii
@@ -396,7 +396,7 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Booking {self.id} - {self.Listing.title}"
+        return f"Booking {self.id} - {self.listing.title}"
 
     @property
     def total_nights(self):

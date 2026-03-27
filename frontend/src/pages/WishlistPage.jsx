@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import '../styles/ListingsGrid.css';
 import ListingDetailModal from '../components/ListingDetailModal';
 import { FaHeart } from "react-icons/fa";
+import api from '../api/axios';
 
 const WishlistPage = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
@@ -20,13 +21,9 @@ const WishlistPage = () => {
         if (!token) return;
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/wishlist/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
-                const data = await response.json();
+            const response = await api.get('/wishlist/');
+            if (response.status === 200) {
+                const data = response.data;
                 // Handle both direct array and paginated results
                 if (Array.isArray(data)) {
                     setWishlistItems(data);
@@ -46,13 +43,8 @@ const WishlistPage = () => {
     const handleRemoveFromWishlist = async (wishlistId) => {
         const token = localStorage.getItem('access');
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/wishlist/${wishlistId}/`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
+            const response = await api.delete(`/wishlist/${wishlistId}/`);
+            if (response.status === 204 || response.status === 200) {
                 setWishlistItems(prev => prev.filter(item => item.id !== wishlistId));
                 window.dispatchEvent(new Event('wishlistUpdate'));
                 if (selectedListing && selectedListing.id === wishlistItems.find(i => i.id === wishlistId)?.listing) {
@@ -67,13 +59,9 @@ const WishlistPage = () => {
     const handleCardClick = async (listingId) => {
         const token = localStorage.getItem('access');
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/listings/${listingId}/`, {
-                headers: {
-                    'Authorization': token ? `Bearer ${token}` : ''
-                }
-            });
-            if (response.ok) {
-                const data = await response.json();
+            const response = await api.get(`/listings/${listingId}/`);
+            if (response.status === 200) {
+                const data = response.data;
                 setSelectedListing(data);
                 setCurrentImageIndex(0);
                 setShowDetailModal(true);
@@ -145,7 +133,7 @@ const WishlistCard = ({ item, onRemove, onClick }) => {
                     <i className="bi bi-heart-fill"></i>
                 </button>
                 <img 
-                    src={`http://127.0.0.1:8000${listing.primary_image}`} 
+                    src={listing.primary_image?.startsWith('http') ? listing.primary_image : `http://127.0.0.1:8000${listing.primary_image}`} 
                     alt={listing.title} 
                 />
             </div>

@@ -117,8 +117,11 @@ USE_I18N = True
 USE_TZ = True
 
 
+# MEDIA_URL = "/media/"
+# MEDIA_ROOT = BASE_DIR / "media"
+
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 
 # Static files (CSS, JavaScript, Images)
@@ -152,7 +155,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
 }
@@ -224,15 +227,23 @@ JAZZMIN_UI_TWEAKS = {
         "success": "btn-success",
     },
 }
-
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("antimgurung314@gmail.com")
-EMAIL_HOST_PASSWORD = os.getenv("jobmspztomotnrxg")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
+# print("EMAIL_HOST_PASSWORD =", EMAIL_HOST_PASSWORD)
+# print("BASE_DIR =", BASE_DIR)
+# print("ENV PATH EXISTS =", (BASE_DIR / ".env").exists())
+# print("EMAIL_HOST_USER raw =", os.getenv("EMAIL_HOST_USER"))
+# print("EMAIL_HOST_PASSWORD raw =", os.getenv("EMAIL_HOST_PASSWORD"))
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+KHALTI_SECRET_KEY = "c831d41cc43f4be088dc047b9f358ae7"
+KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/"
+KHALTI_VERIFY_URL = "https://a.khalti.com/api/v2/epayment/lookup/"

@@ -1,6 +1,7 @@
 import {useEffect,useRef, useState} from "react";
 import {Link, useNavigate} from "react-router-dom";
 import axios from "axios";
+import api from "../api/axios";
 import "../styles/Navbar.css";
 import logo from "../assets/mainlogo.jpg";
 import HostApplicationModal from "./HostApplicationModal";
@@ -8,15 +9,28 @@ import CreateListingModal from "./CreateListingModal";
 import ProfileIcon from "../pages/ProfileIcon";
 import { RxHamburgerMenu } from "react-icons/rx";
 
+
 function Navbar() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [isHostModalOpen, setIsHostModalOpen] = useState(false);
   const [isListingModalOpen, setIsListingModalOpen] = useState(false);
-
+  const [bookingCount, setBookingCount] = useState(0);
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
+    useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const res = await api.get("/host/bookings/");
+        setBookingCount(res.data.length);
+      } catch (err) {
+        console.log("Failed to fetch bookings");
+      }
+    };
+
+    fetchBookings();
+  }, []);
 
   useEffect (() =>{
     const storedUser = localStorage.getItem("user");
@@ -43,26 +57,20 @@ function Navbar() {
   },[]);
 
   const refreshUserData = async () => {
-    const token = localStorage.getItem("access")
-    if (!token) return;
     try {
-      const response = await axios.get("/api/auth/profile",{
-        headers: {
-          Authorization: ` Bearer ${token}`,
-        },
-    }
-  );
+      const response = await api.get("/auth/profile/");
 
-    const latestUser = response.data;
-    localStorage.setItem("user", JSON.stringify(latestUser));
-} catch (error){
-  if (error.response && error.reponse.status === 401){
-    console.warn("Session expired");
-    handleLogout();
-  } else {
-    console,error("Failed to refresh user", error);
-  }
-}
+      const latestUser = response.data;
+      localStorage.setItem("user", JSON.stringify(latestUser));
+      setUser(latestUser);
+    } catch (error) {
+      if (error.response && error.response.status === 401) {
+        console.warn("Session expired");
+        handleLogout();
+      } else {
+        console.error("Failed to refresh user", error);
+      }
+    }
   };
 
   useEffect (()=>{
@@ -171,8 +179,8 @@ return (
                 aria-expanded={open}
               >
                 <span className="nav__hamburger">
-    <RxHamburgerMenu />
-  </span>
+             <RxHamburgerMenu />
+        </span>
               </button>
 
               {open && (
@@ -196,6 +204,22 @@ return (
                           onClick={() => go("/my-properties")}
                         >
                           My Properties
+                        </button>
+                      )}
+
+                      <button
+                        className="nav__dropItem"
+                        onClick={() => go("/my-bookings")}
+                      >
+                        My Bookings
+                      </button>
+
+                      {user.is_host && (
+                        <button
+                          className="nav__dropItem"
+                          onClick={() => go("/host/dashboard")}
+                        >
+                          Host Dashboard
                         </button>
                       )}
 

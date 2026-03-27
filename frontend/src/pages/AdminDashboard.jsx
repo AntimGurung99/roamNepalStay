@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/AdminDashboard.css';
 import UsersManagement from '../components/admin/UsersManagement';
 import HostApplicationsManagement from '../components/admin/HostApplicationsManagement';
-
 import ListingsManagement from '../components/admin/ListingsManagement';
+import BookingsManagement from '../components/admin/BookingsManagement';
+import ReviewsManagement from '../components/admin/ReviewsManagement';
 
-// Admin Dashboard - Main admin panel
+// Admin Dashboard - Main admin panel with premium aesthetics
 const AdminDashboard = () => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -16,12 +17,10 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // ACCESS CONTROL LOGIC:
-        // We check if the logged-in user has staff or superuser flags.
-        // If not, they are redirected back to the home page for safety.
+        // Access Control
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
         if (!storedUser.is_staff && !storedUser.is_superuser) {
-            console.warn("Access denied: User is not staff. Redirecting to home.");
+            console.warn("Access denied. Redirecting.");
             navigate('/');
             return;
         }
@@ -45,11 +44,11 @@ const AdminDashboard = () => {
                 const data = await response.json();
                 setStats(data);
             } else {
-                setError('Failed to fetch dashboard statistics. Please check your connection.');
+                setError('Failed to fetch dashboard statistics. Authentication or Server Error.');
             }
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
-            setError('Connection error. Could not reach the server.');
+            setError('Connection error. Could not reach backend.');
         } finally {
             setLoading(false);
         }
@@ -59,7 +58,7 @@ const AdminDashboard = () => {
         return (
             <div className="admin-loading">
                 <div className="loading-spinner"></div>
-                <p>Loading admin tools...</p>
+                <p>Establishing secure admin session...</p>
             </div>
         );
     }
@@ -68,10 +67,12 @@ const AdminDashboard = () => {
         return (
             <div className="admin-error-page">
                 <div className="error-card">
-                    <h1>Oops! Something went wrong</h1>
+                    <h1>System Error</h1>
                     <p>{error}</p>
-                    <button onClick={fetchDashboardStats} className="btn-retry">Retry Loading</button>
-                    <button onClick={() => navigate('/')} className="btn-back">Back to Home</button>
+                    <div className="error-actions">
+                        <button onClick={fetchDashboardStats} className="btn-retry">Try Again</button>
+                        <button onClick={() => navigate('/')} className="btn-back">Home Page</button>
+                    </div>
                 </div>
             </div>
         );
@@ -79,17 +80,19 @@ const AdminDashboard = () => {
 
     return (
         <div className="admin-dashboard">
-            {/* Admin Header */}
+            {/* Header with improved glassmorphism feel */}
             <header className="admin-header">
                 <div className="admin-header-content">
-                    <div className="admin-logo">Roam Nepal Stay</div>
-                    <h1>Admin Panel</h1>
+                    <div className="admin-header-left">
+                        {/* Hidden or removed logo as requested */}
+                    </div>
+                    <h1>ADMIN PANEL</h1>
                     <div className="admin-user-info">
-                        <span>Welcome, <strong>{user?.first_name || 'Admin'}</strong></span>
+                        <span className="welcome-text">Hi, <strong>{user?.first_name || 'Admin'}</strong></span>
                         <button 
                             onClick={() => {
                                 localStorage.clear();
-                                navigate('/');
+                                navigate('/login');
                             }}
                             className="logout-btn"
                         >
@@ -99,175 +102,153 @@ const AdminDashboard = () => {
                 </div>
             </header>
 
+            {/* Sticky Navigation with Horizontal Scroll Support */}
             <nav className="admin-navbar">
-                <ul className="admin-nav-list">
-                    <li className={activeTab === 'dashboard' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('dashboard')}>
-                            DASHBOARD
-                        </button>
-                    </li>
-                    <li className={activeTab === 'users' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('users')}>
-                            USERS
-                        </button>
-                    </li>
-                    <li className={activeTab === 'host-applications' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('host-applications')}>
-                            HOST APPLICATIONS
-                            {stats?.pending_host_applications > 0 && (
-                                <span className="notification-badge">
-                                    {stats.pending_host_applications}
-                                </span>
-                            )}
-                        </button>
-                    </li>
-                    <li className={activeTab === 'listings' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('listings')}>
-                            LISTINGS
-                            {stats?.pending_listings > 0 && (
-                                <span className="notification-badge">
-                                    {stats.pending_listings}
-                                </span>
-                            )}
-                        </button>
-                    </li>
-                    <li className={activeTab === 'bookings' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('bookings')}>
-                            BOOKINGS
-                        </button>
-                    </li>
-                    <li className={activeTab === 'reviews' ? 'active' : ''}>
-                        <button onClick={() => setActiveTab('reviews')}>
-                            REVIEWS
-                        </button>
-                    </li>
-
-                </ul>
+                <div className="navbar-scroll-container">
+                    <ul className="admin-nav-list">
+                        <li className={activeTab === 'dashboard' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('dashboard')}>
+                                DASHBOARD
+                            </button>
+                        </li>
+                        <li className={activeTab === 'users' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('users')}>
+                                USERS
+                            </button>
+                        </li>
+                        <li className={activeTab === 'host-applications' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('host-applications')}>
+                                APPLICATIONS
+                                {stats?.pending_host_applications > 0 && (
+                                    <span className="notification-badge">{stats.pending_host_applications}</span>
+                                )}
+                            </button>
+                        </li>
+                        <li className={activeTab === 'listings' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('listings')}>
+                                LISTINGS
+                                {stats?.pending_listings > 0 && (
+                                    <span className="notification-badge">{stats.pending_listings}</span>
+                                )}
+                            </button>
+                        </li>
+                        <li className={activeTab === 'bookings' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('bookings')}>
+                                BOOKINGS
+                            </button>
+                        </li>
+                        <li className={activeTab === 'reviews' ? 'active' : ''}>
+                            <button onClick={() => setActiveTab('reviews')}>
+                                REVIEWS
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </nav>
-            <div className="admin-container">
-                {/* Main Content Area */}
-                <main className="admin-main-content">
-                    {activeTab === 'dashboard' && (
-                        <DashboardOverview stats={stats} />
-                    )}
-                    {activeTab === 'users' && (
-                        <UsersManagement />
-                    )}
-                    {activeTab === 'host-applications' && (
-                        <HostApplicationsManagement />
-                    )}
-                    {activeTab === 'listings' && (
-                        <ListingsManagement />
-                    )}
-                    {activeTab === 'bookings' && (
-                        <BookingsManagement />
-                    )}
-                    {activeTab === 'reviews' && (
-                        <ReviewsManagement />
-                    )}
 
+            <div className="admin-container">
+                <main className="admin-main-content">
+                    {activeTab === 'dashboard' && <DashboardOverview stats={stats} />}
+                    {activeTab === 'users' && <UsersManagement />}
+                    {activeTab === 'host-applications' && <HostApplicationsManagement />}
+                    {activeTab === 'listings' && <ListingsManagement />}
+                    {activeTab === 'bookings' && <BookingsManagement />}
+                    {activeTab === 'reviews' && <ReviewsManagement />}
                 </main>
             </div>
         </div>
     );
 };
 
-// Dashboard Overview Component
+// Enhanced Dashboard Overview Component
 const DashboardOverview = ({ stats }) => {
-    if (!stats) return <div>Loading stats...</div>;
+    if (!stats) return <div className="loading-stats">Refreshing stats...</div>;
 
     return (
-        <div className="dashboard-overview">
-            <h2>Dashboard Overview</h2>
+        <div className="dashboard-overview animate-fade-in">
+            <div className="section-header">
+                <h2>System Overview</h2>
+                <p>Real-time analytics across RoamNepalStay ecosystem</p>
+            </div>
             
-            {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-info">
                         <h3>{stats.total_users}</h3>
-                        <p>Total Users</p>
+                        <p>Total Community</p>
                     </div>
                 </div>
                 
                 <div className="stat-card">
                     <div className="stat-info">
                         <h3>{stats.total_hosts}</h3>
-                        <p>Total Hosts</p>
+                        <p>Active Hosts</p>
                     </div>
                 </div>
                 
                 <div className="stat-card">
                     <div className="stat-info">
                         <h3>{stats.total_listings}</h3>
-                        <p>Total Listings</p>
+                        <p>Total Properties</p>
                     </div>
                 </div>
                 
                 <div className="stat-card">
                     <div className="stat-info">
                         <h3>{stats.total_bookings}</h3>
-                        <p>Total Bookings</p>
+                        <p>Total Stay Reservations</p>
                     </div>
                 </div>
                 
                 <div className="stat-card highlight">
                     <div className="stat-info">
-                        <h3>Rs. {stats.total_revenue}</h3>
-                        <p>Total Revenue</p>
+                        <h3>Rs. {Number(stats.total_revenue).toLocaleString()}</h3>
+                        <p>Gross Platform Revenue</p>
                     </div>
                 </div>
                 
                 <div className="stat-card warning">
                     <div className="stat-info">
                         <h3>{stats.pending_host_applications}</h3>
-                        <p>Pending Applications</p>
+                        <p>Pending Verifications</p>
                     </div>
                 </div>
             </div>
 
-            {/* Recent Activities */}
             <div className="recent-activities">
-                <div className="recent-section">
-                    <h3>Recent Bookings</h3>
+                <div className="recent-section card-elevated">
+                    <h3>Latest Bookings</h3>
                     <div className="recent-list">
                         {stats.recent_bookings?.map(booking => (
-                            <div key={booking.id} className="recent-item">
+                            <div key={booking.id} className="recent-item hover-effect">
                                 {booking.listing_image ? (
-                                    <img src={`http://127.0.0.1:8000${booking.listing_image}`} className="admin-listing-img" style={{ width: '50px', height: '35px', marginRight: '10px' }} />
+                                    <img src={`http://127.0.0.1:8000${booking.listing_image}`} className="admin-listing-img" alt="Property" />
                                 ) : (
-                                    <div style={{ width: '50px', height: '35px', background: '#eee', borderRadius: '4px', marginRight: '10px' }}></div>
+                                    <div className="placeholder-img"></div>
                                 )}
                                 <div className="recent-info">
                                     <strong>{booking.guest_name}</strong>
                                     <span>{booking.listing_title}</span>
                                     <small>{new Date(booking.created_at).toLocaleDateString()}</small>
                                 </div>
-                                <div className="recent-amount">
-                                    Rs. {booking.total_amount}
-                                </div>
+                                <div className="recent-amount">Rs. {booking.total_amount}</div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="recent-section">
-                    <h3>Recent Reviews</h3>
+                <div className="recent-section card-elevated">
+                    <h3>Recent Feedback</h3>
                     <div className="recent-list">
                         {stats.recent_reviews?.map(review => (
-                            <div key={review.id} className="recent-item">
-                                {review.reviewer_image ? (
-                                    <img src={`http://127.0.0.1:8000${review.reviewer_image}`} className="admin-avatar" style={{ width: '35px', height: '35px', marginRight: '10px' }} />
-                                ) : (
-                                    <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: '#eee', marginRight: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>{review.reviewer_name?.charAt(0)}</div>
-                                )}
+                            <div key={review.id} className="recent-item hover-effect">
+                                <div className="avatar-small">{review.reviewer_name?.charAt(0)}</div>
                                 <div className="recent-info">
                                     <strong>{review.reviewer_name}</strong>
                                     <span>{review.listing_title}</span>
                                     <small>{new Date(review.created_at).toLocaleDateString()}</small>
                                 </div>
-                                <div className="recent-rating">
-                                    Rating: {review.rating}
-                                </div>
+                                <div className="recent-rating">⭐ {review.rating}</div>
                             </div>
                         ))}
                     </div>
@@ -276,9 +257,5 @@ const DashboardOverview = ({ stats }) => {
         </div>
     );
 };
-
-// Placeholder components
-const BookingsManagement = () => <div>Bookings Management Component</div>;
-const ReviewsManagement = () => <div>Reviews Management Component</div>;
 
 export default AdminDashboard;

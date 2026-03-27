@@ -10,29 +10,126 @@ from .models import Listing, ListingImage, HostApplication, Booking, Review, Wis
 User = get_user_model()
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-    # email = serializers.EmailField(
-    #     required=True, error_messages={"invalid": "Enter a valid email address"}
-    # )
-    # password = serializers.CharField(write_only= True, required = True)
-    confirm_password = serializers.CharField(write_only=True)
+# class RegisterSerializer(serializers.ModelSerializer):
+# email = serializers.EmailField(
+#     required=True, error_messages={"invalid": "Enter a valid email address"}
+# )
+# password = serializers.CharField(write_only= True, required = True)
+# confirm_password = serializers.CharField(write_only=True)
 
-    class Meta:
-        model = User
-        fields = (
-            "first_name",
-            "last_name",
-            "email",
-            "password",
-            "confirm_password",
-            "phone_number",
-            "profile_image",
-            "date_of_birth",
-            "city",
-            "country",
-            "accepted_terms",
-        )
-        extra_kwargs = {"password": {"write_only": True}}
+# class Meta:
+#     model = User
+#     fields = (
+#         "first_name",
+#         "last_name",
+#         "email",
+#         "password",
+#         "confirm_password",
+#         "phone_number",
+#         "profile_image",
+#         "date_of_birth",
+#         "city",
+#         "country",
+#         "accepted_terms",
+#     )
+#     extra_kwargs = {"password": {"write_only": True}}
+
+# def validate(self, attrs):
+#     first_name = (attrs.get("first_name") or "").strip()
+#     last_name = (attrs.get("last_name") or "").strip()
+#     email = (attrs.get("email") or "").strip().lower()
+#     password = attrs.get("password")
+#     confirm_password = attrs.get("confirm_password")
+
+#     if not first_name:
+#         raise serializers.ValidationError(
+#             {"first_name": ["First name is required."]}
+#         )
+#     if not last_name:
+#         raise serializers.ValidationError({"last_name": ["Last name is required."]})
+#     if not email:
+#         raise serializers.ValidationError({"email": ["Email is required."]})
+#     if not confirm_password:
+#         raise serializers.ValidationError(
+#             {"confirm_password": ["Confirm password is required."]}
+#         )
+#     # password check
+#     if password != confirm_password:
+#         raise serializers.ValidationError(
+#             {"confirm_password": ["Passwords do not match."]}
+#         )
+
+#     try:
+#         validate_password(password)
+#     except DjangoValidationError as e:
+#         raise serializers.ValidationError({"password": e.messages})
+#     # Built=in email format validation
+#     try:
+#         validate_email(email)
+#     except DjangoValidationError:
+#         raise serializers.ValidationError({"email": "Enter a valid email address."})
+
+#     # Extra strict validation()
+#     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+#     if not re.match(email_regex, email):
+#         raise serializers.ValidationError({"email": "Invalid email format."})
+#     # prevent numeric only usernames
+#     local_part = email.split("@")[0]
+#     if local_part.isdigit():
+#         raise serializers.ValidationError(
+#             {"email": "Email cannot start with only numbers."}
+#         )
+
+#     # email uniqueness
+#     if User.objects.filter(email__iexact=email).exists():
+#         raise serializers.ValidationError({"email": "Email already exists."})
+
+#     # terms acceptance
+#     if attrs.get("accepted_terms") is not True:
+#         raise serializers.ValidationError(
+#             {"accepted_terms": "You must accepts and conditions."}
+#         )
+
+# if User.objects.filter(
+#     first_name__iexact=first_name, last_name__iexact=last_name
+# ).exists():
+#     raise serializers.ValidationError({"name": ["Same name already exists."]})
+#     attrs["first_name"] = first_name
+#     attrs["last_name"] = last_name
+#     attrs["email"] = email
+#     return attrs
+
+# def create(self, validated_data):
+#     validated_data.pop("confirm_password")
+
+#     user = User.objects.create_user(
+#         email=validated_data["email"],
+#         password=validated_data["password"],
+#         first_name=validated_data["first_name"],
+#         last_name=validated_data["last_name"],
+#         phone_number=validated_data.get("phone_number"),
+#         city=validated_data.get("city"),
+#         country=validated_data.get("country"),
+#         date_of_birth = validated_data.get("date_of_birth"),
+#         accepted_terms=validated_data.get("accepted_terms"),
+#     )
+
+
+#     return user
+class RegisterSerializer(serializers.Serializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+    phone_number = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    profile_image = serializers.ImageField(required=False, allow_null=True)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    city = serializers.CharField()
+    country = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    accepted_terms = serializers.BooleanField()
 
     def validate(self, attrs):
         first_name = (attrs.get("first_name") or "").strip()
@@ -53,7 +150,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"confirm_password": ["Confirm password is required."]}
             )
-        # password check
+
         if password != confirm_password:
             raise serializers.ValidationError(
                 {"confirm_password": ["Passwords do not match."]}
@@ -63,57 +160,30 @@ class RegisterSerializer(serializers.ModelSerializer):
             validate_password(password)
         except DjangoValidationError as e:
             raise serializers.ValidationError({"password": e.messages})
-        # Built=in email format validation
+
         try:
             validate_email(email)
         except DjangoValidationError:
-            raise serializers.ValidationError({"email": "Enter a valid email address."})
+            raise serializers.ValidationError(
+                {"email": ["Enter a valid email address."]}
+            )
 
-        # Extra strict validation()
         email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(email_regex, email):
-            raise serializers.ValidationError({"email": "Invalid email format."})
-        # prevent numeric only usernames
-        local_part = email.split("@")[0]
-        if local_part.isdigit():
-            raise serializers.ValidationError(
-                {"email": "Email cannot start with only numbers."}
-            )
+            raise serializers.ValidationError({"email": ["Invalid email format."]})
 
-        # email uniqueness
         if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError({"email": "Email already exists."})
+            raise serializers.ValidationError({"email": ["Email already exists."]})
 
-        # terms acceptance
         if attrs.get("accepted_terms") is not True:
             raise serializers.ValidationError(
-                {"accepted_terms": "You must accepts and conditions."}
+                {"accepted_terms": ["You must accept terms and conditions."]}
             )
 
-        # if User.objects.filter(
-        #     first_name__iexact=first_name, last_name__iexact=last_name
-        # ).exists():
-        #     raise serializers.ValidationError({"name": ["Same name already exists."]})
         attrs["first_name"] = first_name
         attrs["last_name"] = last_name
         attrs["email"] = email
         return attrs
-
-    def create(self, validated_data):
-        validated_data.pop("confirm_password")
-
-        user = User.objects.create_user(
-            email=validated_data["email"],
-            password=validated_data["password"],
-            first_name=validated_data["first_name"],
-            last_name=validated_data["last_name"],
-            phone_number=validated_data.get("phone_number"),
-            city=validated_data.get("city"),
-            country=validated_data.get("country"),
-            accepted_terms=validated_data.get("accepted_terms"),
-        )
-
-        return user
 
 
 class VerifyOTPSerializer(serializers.Serializer):
@@ -158,24 +228,65 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         email = (attrs.get("email") or "").strip().lower()
         password = attrs.get("password")
-
-        try:
-            user_obj = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-
-            raise serializers.ValidationError({"detail": "Invalid email or password."})
-
-        user = authenticate(username=user_obj.username, password=password)
+        user = authenticate(
+            request=self.context.get("request"), email=email, password=password
+        )
         if not user:
 
             raise serializers.ValidationError({"detail": "Invalid email or password."})
-        if not user.is_email_verified:
-            raise serializers.ValidationError(
-                {"details": "Please verify your email first"}
-            )
+
+        # Admin users skip email verification
+        if not (user.is_staff or user.is_superuser):
+            if not user.is_email_verified:
+                raise serializers.ValidationError(
+                    {"detail": "Please verify your email first"}
+                )
 
         attrs["user"] = user
         return attrs
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+            "profile_image",
+            "date_of_birth",
+            "city",
+            "country",
+            "is_host",
+            "is_staff",
+            "host_application_status",
+        ]
+        read_only_fields = [
+            "id",
+            "email",
+            "is_host",
+            "is_staff",
+            "host_application_status",
+        ]
+
+    def validate_phone_number(self, value):
+        if value and not value.isdigit():
+            raise serializers.ValidationError("Phone number must contain only digits.")
+        if value and len(value) != 10:
+            raise serializers.ValidationError("Phone number must be 10 digits.")
+        return value
+
+    def validate_first_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("First name cannot be empty.")
+        return value.strip()
+
+    def validate_last_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Last name cannot be empty.")
+        return value.strip()
 
 
 # Admin Panel Serializers
@@ -221,14 +332,14 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id",
-            "username",
             "email",
             "first_name",
             "last_name",
             "full_name",
             "phone_number",
-            "address",
             "profile_image",
+            "city",
+            "country",
             "is_host",
             "host_application_status",
             "is_active",
@@ -486,6 +597,7 @@ class BookingListSerializer(serializers.ModelSerializer):
     guest_name = serializers.SerializerMethodField()
     listing_title = serializers.SerializerMethodField()
     host_name = serializers.SerializerMethodField()
+    listing_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -525,6 +637,7 @@ class ReviewListSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.SerializerMethodField()
     listing_title = serializers.SerializerMethodField()
     moderated_by_name = serializers.SerializerMethodField()
+    reviewer_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -638,3 +751,188 @@ class WishlistSerializer(serializers.ModelSerializer):
 
     def get_listing_details(self, obj):
         return ListingListSerializer(obj.listing, context=self.context).data
+
+
+class BookingCreateSerializer(serializers.ModelSerializer):
+    total_nights = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Booking
+        fields = [
+            "id",
+            "listing",
+            "check_in",
+            "check_out",
+            "guests_count",
+            "special_requests",
+            "total_amount",
+            "cleaning_fee",
+            "service_fee",
+            "total_nights",
+            "status",
+            "payment_status",
+            "created_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "total_amount",
+            "cleaning_fee",
+            "service_fee",
+            "status",
+            "payment_status",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        check_in = attrs.get("check_in")
+        check_out = attrs.get("check_out")
+        guests_count = attrs.get("guests_count")
+        listing = attrs.get("listing")
+
+        # check in chai future mah huna parcha
+        from django.utils.timezone import now
+
+        if check_in < now().date():
+            raise serializers.ValidationError(
+                {"check_in": "check-in date cannot be in the past."}
+            )
+        # check out must be after check in
+        if check_out <= check_in:
+            raise serializers.ValidationError(
+                {"check_out": "Check-out must be after check-in date."}
+            )
+
+        # guests must not exceed listing max
+        if guests_count > listing.max_guests:
+            raise serializers.ValidationError(
+                {"guests_count": f"Max guests allowed is {listing.max_guests}."}
+            )
+        # check if listing is available(no overlapping confirmed/paid bookings)
+        overlapping = Booking.objects.filter(
+            listing=listing,
+            status__in=["pending", "confirmed", "paid"],
+            check_in__lt=check_out,
+            check_out__gt=check_in,
+        ).exists()
+
+        if overlapping:
+            raise serializers.ValidationError(
+                {"check_in": "This listing is already booked for the selected dates."}
+            )
+        return attrs
+
+
+# class BookingDetailSerializer(serializers.ModelSerializer):
+#     listing_title = serializers.CharField(source="listing.title", read_only=True)
+#     listing_image = serializers.SerializerMethodField()
+#     listing_city = serializers.CharField(source="listing.city", read_only=True)
+#     guest_name = serializers.SerializerMethodField()
+#     host_name = serializers.SerializerMethodField()
+#     host_id = serializers.IntegerField(source="listing.host.id", read_only=True)
+#     total_nights = serializers.ReadOnlyField()
+
+#     class Meta:
+#         model = Booking
+#         fields = [
+#             "id",
+#             "listing",
+#             "listing_title",
+#             "listing_image",
+#             "listing_city",
+#             "guest_name",
+#             "host_name",
+#             "host_id",
+#             "check_in",
+#             "check_out",
+#             "guests_count",
+#             "special_requests",
+#             "total_amount",
+#             "cleaning_fee",
+#             "service_fee",
+#             "total_nights",
+#             "status",
+#             "payment_status",
+#             "khalti_transaction_id",
+#             "paid_at",
+#             "host_responded_at",
+#             "host_rejection_reasons",
+#             "created_at",
+#             "updated_at",
+#         ]
+
+
+# def get_listing_image(self, obj):
+#     primary = obj.listing.images.filter(is_primary=True)
+#     if not primary:
+#         primary = obj.listing.images.first()
+#     if primary:
+#         request = self.context.get("request")
+#         if request:
+#             return request.build_absolute_uri(primary.image.url)
+#         return primary.image.url
+#     return None
+
+
+# def get_guest_name(self, obj):
+#     return f"{obj.guest.first_name} {obj.guest.last_name}"
+
+
+# def get_host__name(self, obj):
+#     return f"{obj.listing.host.first_name} {obj.listing.host.last_name}"
+
+
+class BookingDetailSerializer(serializers.ModelSerializer):
+    listing_title = serializers.CharField(source="listing.title", read_only=True)
+    listing_image = serializers.SerializerMethodField()
+    listing_city = serializers.CharField(source="listing.city", read_only=True)
+    guest_name = serializers.SerializerMethodField()
+    host_name = serializers.SerializerMethodField()
+    host_id = serializers.IntegerField(source="listing.host.id", read_only=True)
+    total_nights = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Booking
+        fields = [
+            "id",
+            "listing",
+            "listing_title",
+            "listing_image",
+            "listing_city",
+            "guest_name",
+            "host_name",
+            "host_id",
+            "check_in",
+            "check_out",
+            "guests_count",
+            "special_requests",
+            "total_amount",
+            "cleaning_fee",
+            "service_fee",
+            "total_nights",
+            "status",
+            "payment_status",
+            "khalti_transaction_id",
+            "paid_at",
+            "host_responded_at",
+            "host_rejection_reasons",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_listing_image(self, obj):
+        primary = obj.listing.images.filter(is_primary=True).first()
+        if not primary:
+            primary = obj.listing.images.first()
+        if primary:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(primary.image.url)
+            return primary.image.url
+        return None
+
+    def get_guest_name(self, obj):
+        return f"{obj.guest.first_name} {obj.guest.last_name}"
+
+    def get_host_name(self, obj):
+        return f"{obj.listing.host.first_name} {obj.listing.host.last_name}"

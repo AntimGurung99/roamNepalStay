@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
+import api from '../api/axios';
 import '../styles/ListingDetailModal.css';
+import BookingModal from './BookingModal';
+
 const WishlistHeart = ({ listingId, initialIsWishlisted }) => {
     const [isWishlisted, setIsWishlisted] = useState(initialIsWishlisted);
+    
     const [loading, setLoading] = useState(false);
-
+       
     React.useEffect(() => {
         setIsWishlisted(initialIsWishlisted);
     }, [initialIsWishlisted]);
@@ -17,17 +21,11 @@ const WishlistHeart = ({ listingId, initialIsWishlisted }) => {
 
         setLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/listings/${listingId}/toggle_wishlist/`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            const response = await api.post(`/listings/${listingId}/toggle_wishlist/`);
             
-            const data = await response.json();
+            const data = response.data;
             
-            if (response.ok) {
+            if (response.status === 200) {
                 setIsWishlisted(data.is_wishlisted);
                 window.dispatchEvent(new Event('wishlistUpdate'));
             }
@@ -52,6 +50,7 @@ const WishlistHeart = ({ listingId, initialIsWishlisted }) => {
 
 const ListingDetailModal = ({ isOpen, onClose, selectedListing, showWishlist = true }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [showBookingModal, setShowBookingModal] = useState(false);
 
     React.useEffect(() => {
         if (isOpen && selectedListing) {
@@ -117,7 +116,7 @@ const ListingDetailModal = ({ isOpen, onClose, selectedListing, showWishlist = t
                         </div>
                     ) : (
                         <div className="no-images-placeholder">
-                            <span style={{ fontSize: '48px' }}>🏠</span>
+                            <span style={{ fontSize: '48px' }}></span>
                             <p>No images available</p>
                         </div>
                     )}
@@ -240,7 +239,7 @@ const ListingDetailModal = ({ isOpen, onClose, selectedListing, showWishlist = t
                                     <i className="bi bi-star-fill"></i> {selectedListing.average_rating || "New"}
                                 </div>
                             </div>
-                            <div className="booking-form-dummy">
+                            {/* <div className="booking-form-dummy">
                                 <div className="check-in-out">
                                     <div className="date-input">
                                         <label>CHECK-IN</label>
@@ -255,11 +254,20 @@ const ListingDetailModal = ({ isOpen, onClose, selectedListing, showWishlist = t
                                     <label>GUESTS</label>
                                     <span>1 guest</span>
                                 </div>
-                            </div>
-                            <button className="reserve-btn-primary">Reserve Now</button>
+                            </div> */}
+                            {/* <button className="reserve-btn-primary">Reserve Now</button> */}
+                            <button
+                            className='reserve-btn-primary' onClick={() => {
+                                const token = localStorage.getItem("access");
+                                if (!token){
+                                   alert("Please login to make a booking.");
+                                   return;
+                                }
+                                setShowBookingModal(true)
+                            }}  >Reserve Now</button>
                             <p className="wont-charge">You won't be charged yet</p>
 
-                            <div className="price-breakdown">
+                            {/* <div className="price-breakdown">
                                 <div className="breakdown-row">
                                     <span>Rs. {selectedListing.price_per_night} x 5 nights</span>
                                     <span>Rs. {selectedListing.price_per_night * 5}</span>
@@ -272,9 +280,14 @@ const ListingDetailModal = ({ isOpen, onClose, selectedListing, showWishlist = t
                                 <div className="breakdown-total">
                                     <span>Total</span>
                                     <span>Rs. {selectedListing.price_per_night * 5 + (selectedListing.cleaning_fee || 0)}</span>
-                                </div>
-                            </div>
+                                </div> */}
+                            
                         </div>
+                        <BookingModal
+                                     isOpen={showBookingModal}
+                                     onClose={() => setShowBookingModal(false)}
+                                     listing={selectedListing}
+                                />
                     </div>
                 </div>
             </div>

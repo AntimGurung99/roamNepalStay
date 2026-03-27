@@ -1,131 +1,151 @@
-import React, {useState} from "react";
+import React, { useState } from "react";
 import api from "../api/axios";
 import "../styles/BookingModal.css";
 
-
 const BookingModal = ({ isOpen, onClose, listing }) => {
-   const [step, setStep] = useState(1);
-   const [ checkIn, setCheckIn] = useState("");
-   const [checkOut,setCheckOut] = useState("");
-   const [ guestsCount, setGuestsCount] = useState(1);
-   const [specialRequests, setSpecialRequests] = useState("");
-   const [booking, setBooking] = useState(null);
-   const [loading, setLoading] = useState("");
-   const [error, setError] = useState("");
+  const [step, setStep] = useState(1);
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [guestsCount, setGuestsCount] = useState(1);
+  const [specialRequests, setSpecialRequests] = useState("");
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
+  if (!isOpen || !listing) return null;
 
-   if (!isOpen || !listing) return null;
+  const calculateNights = () => {
+    if (!checkIn || !checkOut) return 0;
+    const diff = new Date(checkOut) - new Date(checkIn);
+    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  };
 
-   //Calculate nights and total
-   const calculateNights = () => {
-      if (!checkIn || !checkOut) return 0;
-      const diff = new Date(checkOut) - new Date(checkIn);
-      return Math.max(0, Math.floor(diff / (1000 * 60 * 60 *24)));
-   };
-    
-   const nights = calculateNights();
-   const pricePerNight = parseFloat(listing.price_per_night || 0);
-   const cleaningFee = parseFloat(listing.cleaning_fee || 0);
-   const serviceFee = Math.round(pricePerNight * nights * 0.05 * 100) / 100;
-   const total = pricePerNight * nights + cleaningFee + serviceFee;
+  const nights = calculateNights();
+  const pricePerNight = parseFloat(listing.price_per_night || 0);
+  const cleaningFee = parseFloat(listing.cleaning_fee || 0);
+  const serviceFee = Math.round(pricePerNight * nights * 0.05 * 100) / 100;
+  const total = pricePerNight * nights + cleaningFee + serviceFee;
+  const today = new Date().toISOString().split("T")[0];
 
+  const handleNext = () => {
+    setError("");
+    if (!checkIn || !checkOut) {
+      setError("Please select check-in and check-out dates.");
+      return;
+    }
+    if (nights <= 0) {
+      setError("Check-out must be after check-in.");
+      return;
+    }
+    if (guestsCount < 1 || guestsCount > listing.max_guests) {
+      setError(`Guests must be between 1 and ${listing.max_guests}.`);
+      return;
+    }
+    setStep(2);
+  };
 
-   // today's date for min date
-   const today = new Date().toISOString().split("T")[0];
+  // Step 1: Create booking then initiate Khalti payment
+  const handlePayNow = async () => {
+    setPaymentLoading(true);
+    setError("");
 
-   const handleNext = () => {
-      setError("");
-      if (step === 1){
-         if (!checkIn || !checkOut){
-            setError("Please select check-in and check-out dates.");
-            return;
-         }
-         if (nights <= 0){
-            setError("Check-out must be after check-in.");
-            return;
-         }
-         if (guestsCount < 1 || guestsCount > listing.max_guests){
-            setError(`Guests must be between 1 and ${listing.max_guests}.`);
-            return;
-         }
-         setStep(2);
+    try {
+      // Step 1 — Create booking
+      const bookingRes = await api.post("/bookings/", {
+        listing: listing.id,
+        check_in: checkIn,
+        check_out: checkOut,
+        guests_count: guestsCount,
+        special_requests: specialRequests,
+      });
+
+      const newBooking = bookingRes.data;
+      setBooking(newBooking);
+
+      // Step 2 — Initiate Khalti payment
+      const paymentRes = await api.post(
+        `/bookings/${newBooking.id}/initiate-payment/`,
+        {}
+      );
+
+      const { payment_url } = paymentRes.data;
+
+      if (payment_url) {
+        // Save booking id for after redirect
+        localStorage.setItem("pending_booking_id", newBooking.id);
+        localStorage.setItem("pending_booking_pidx", paymentRes.data.pidx);
+
+        // Redirect to Khalti
+        window.location.href = payment_url;
+      } else {
+        setError("Failed to get payment URL. Please try again.");
       }
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.check_in?.[0] ||
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        "Something went wrong. Please try again.";
+      setError(errMsg);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
-   };
-   const handleConfirmBooking = async () => {
-      setLoading(true);
-      setError("");
-      try {
-         const res = await api.post ("/bookings/", {
-            listing: listing.id,
-            check_in: checkIn,
-            checkOut: checkOut,
-            guests_count: guestsCount,
-            special_requests: specialRequests,
+  const handleClose = () => {
+    setStep(1);
+    setCheckIn("");
+    setCheckOut("");
+    setGuestsCount(1);
+    setSpecialRequests("");
+    setBooking(null);
+    setError("");
+    onClose();
+  };
 
-         });
-         setBooking(res.data);
-         setStep(3);
-
-      } catch (err) {
-         setError(
-            err?.response?.data?.check_in?.[0] ||
-            err?.response?.data?.detail ||
-            "Failed to create booking. Please try again."
-         );
-      } finally {
-         setLoading(false)
-      }
-   };
-
-   const handleClose = () => {
-      setStep(1);
-      setCheckIn("");
-      setCheckOut("");
-      setGuestsCount(1);
-      setSpecialRequests("");
-      setBooking(null);
-      setError("");
-      onClose();
-
-   };
-
-return(
-   <div className="booking-modal-overlay" onClick={handleClose}>
+  return (
+    <div className="booking-modal-overlay" onClick={handleClose}>
       <div className="booking-modal" onClick={(e) => e.stopPropagation()}>
-         <div className="booking-modal-header">
-            <h2>
-                  {step === 1 && "Select Dates & Guests"}
-                  {step === 2 && "Review Your Booking"}
-                  {step === 3 && "Booking Confirmed!"}
-            </h2>
-            <button className="booking-close-btn" onClick={handleClose}>✕</button>
-         </div>
 
-         {/* Step Indicator */}
+        {/* Header */}
+        <div className="booking-modal-header">
+          <h2>
+            {step === 1 && "Select Dates & Guests"}
+            {step === 2 && "Review & Pay"}
+          </h2>
+          <button className="booking-close-btn" onClick={handleClose}>✕</button>
+        </div>
+
+        {/* Step Indicator */}
         <div className="booking-steps">
-          {[1, 2, 3].map((s) => (
+          {[1, 2].map((s) => (
             <div key={s} className={`booking-step ${step >= s ? "active" : ""}`}>
               <div className="step-circle">{s}</div>
-              <span>{s === 1 ? "Dates" : s === 2 ? "Review" : "Done"}</span>
+              <span>{s === 1 ? "Dates" : "Pay"}</span>
             </div>
           ))}
         </div>
-         {/* Error */}
+
+        {/* Error */}
         {error && <div className="booking-error">{error}</div>}
 
-         {/* Step 1 — Dates & Guests */}
+        {/* Step 1 — Dates & Guests */}
         {step === 1 && (
           <div className="booking-step-content">
             <div className="booking-listing-info">
-              <img
-                src={listing.primary_image?.startsWith("http")
-                  ? listing.primary_image
-                  : `http://127.0.0.1:8000${listing.primary_image}`}
-                alt={listing.title}
-                className="booking-listing-img"
-                onError={(e) => { e.target.style.display = "none"; }}
-              />
+              {listing.primary_image && (
+                <img
+                  src={
+                    listing.primary_image?.startsWith("http")
+                      ? listing.primary_image
+                      : `http://127.0.0.1:8000${listing.primary_image}`
+                  }
+                  alt={listing.title}
+                  className="booking-listing-img"
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
+              )}
               <div>
                 <h3>{listing.title}</h3>
                 <p>{listing.city}, {listing.country}</p>
@@ -157,6 +177,12 @@ return(
               </div>
             </div>
 
+            {nights > 0 && (
+              <div className="nights-preview">
+                {nights} night{nights > 1 ? "s" : ""} · Rs. {total.toFixed(2)} total
+              </div>
+            )}
+
             <div className="booking-guests">
               <label>Guests (max {listing.max_guests})</label>
               <div className="guest-counter">
@@ -183,17 +209,19 @@ return(
             </div>
 
             <button className="booking-btn-primary" onClick={handleNext}>
-              Continue →
+              Continue 
             </button>
           </div>
         )}
 
-        {/* Step 2 — Price Breakdown */}
+        {/* Step 2 — Review & Pay */}
         {step === 2 && (
           <div className="booking-step-content">
             <div className="booking-summary">
               <h3>{listing.title}</h3>
-              <p>{checkIn} → {checkOut} · {nights} night{nights > 1 ? "s" : ""} · {guestsCount} guest{guestsCount > 1 ? "s" : ""}</p>
+              <p>
+                {checkIn} → {checkOut} · {nights} night{nights > 1 ? "s" : ""} · {guestsCount} guest{guestsCount > 1 ? "s" : ""}
+              </p>
             </div>
 
             <div className="booking-breakdown">
@@ -216,63 +244,39 @@ return(
               </div>
             </div>
 
+            {/* Khalti payment info */}
+            <div className="khalti-info">
+              <img
+                src="https://web.khalti.com/static/img/logo1.png"
+                alt="Khalti"
+                style={{ height: "28px" }}
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
+              <p>You will be redirected to Khalti to complete payment securely.</p>
+            </div>
+
             <div className="booking-notice">
-              <p> Your booking will be <strong>pending</strong> until the host accepts.</p>
-              <p> You will only pay <strong>after host accepts</strong>.</p>
+              <p>Booking is <strong>confirmed immediately</strong> after payment.</p>
+              <p>Host will be notified after your payment.</p>
+              <p>Same dates will be blocked for other guests.</p>
             </div>
 
             <div className="booking-btn-group">
-              <button className="booking-btn-secondary" onClick={() => setStep(1)}>
-                 Back
+              <button
+                className="booking-btn-secondary"
+                onClick={() => setStep(1)}
+                disabled={paymentLoading}
+              >
+                ← Back
               </button>
               <button
-                className="booking-btn-primary"
-                onClick={handleConfirmBooking}
-                disabled={loading}
+                className="booking-btn-khalti"
+                onClick={handlePayNow}
+                disabled={paymentLoading}
               >
-                {loading ? "Booking..." : "Confirm Booking"}
+                {paymentLoading ? "Processing..." : "Pay with Khalti"}
               </button>
             </div>
-          </div>
-        )}
-
-        {/* Step 3 — Success */}
-        {step === 3 && booking && (
-          <div className="booking-step-content booking-success">
-            <div className="success-icon"></div>
-            <h3>Booking Request Sent!</h3>
-            <p>Your booking for <strong>{listing.title}</strong> has been submitted.</p>
-
-            <div className="booking-breakdown">
-              <div className="breakdown-row">
-                <span>Booking ID</span>
-                <span>{booking.id}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Check-in</span>
-                <span>{booking.check_in}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Check-out</span>
-                <span>{booking.check_out}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Total Amount</span>
-                <span>Rs. {parseFloat(booking.total_amount).toFixed(2)}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Status</span>
-                <span className="status-pending"> Pending host approval</span>
-              </div>
-            </div>
-
-            <p className="booking-next-step">
-              The host will review your request. Once accepted, you can proceed to payment via Khalti.
-            </p>
-
-            <button className="booking-btn-primary" onClick={handleClose}>
-              Done
-            </button>
           </div>
         )}
       </div>
@@ -281,17 +285,3 @@ return(
 };
 
 export default BookingModal;
-
-
-
-
-
-
-
-
-
-
-
-
- 
-

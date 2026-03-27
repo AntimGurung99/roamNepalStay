@@ -12,9 +12,12 @@ import AdminLogin from "./pages/AdminLogin";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
 // import HostApplicationPage from "./pages/HostApplicationPage";
 import TestPage from "./pages/TestPage";
+import MyBookings from "./pages/MyBookings";
 import { Outlet } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import HostDashboard from "./pages/HostDashboard";
 
 function App(){
     return(
@@ -29,6 +32,7 @@ function App(){
              <Route path= "/profile" element= {<ProfilePage/>}/>
              <Route path= "/my-properties" element= {<MyProperties/>}/>
              <Route path= "/wishlist" element= {<WishlistPage/>}/>
+             <Route path= "/my-bookings" element= {<MyBookings/>}/>
              {/* Host Routes */}
              {/* <Route path= "/become-host" element= {<HostApplicationPage/>}/> */}
              {/* Admin Routes */}
@@ -36,6 +40,9 @@ function App(){
              <Route path= "/admin" element= {<AdminDashboard/>}/>
              {/* Test Route */}
              <Route path= "/test" element= {<TestPage/>}/>
+             <Route path="/booking/payment-success/" element={<PaymentSuccess />} />
+             <Route path="/host/dashboard" element={<HostDashboard />} />
+             
           </Routes>
            <ToastContainer
             position="top-right"

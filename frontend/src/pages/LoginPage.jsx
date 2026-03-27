@@ -97,7 +97,7 @@ export default function LoginPage() {
       <form className="login-card" onSubmit={onSubmit}>
         <h2 className="login-title">Log In</h2>
 
-        <div className="error-box">{errors.general}</div>
+        {errors.general && <div className="login-error-box">{errors.general}</div>}
 
         <input
           type="email"

@@ -22,6 +22,7 @@ const ProfilePage = () => {
          phone_number: user.phone_number || "",
          city: user.city || "",
          country: user.country || "",
+         date_of_birth: user.date_of_birth || "",
     });
     setIsEditing(true);
 
@@ -54,7 +55,7 @@ const ProfilePage = () => {
         refreshUserData();
       } catch (err) {
         console.error("Failed to parse user:", err);
-        navigate("/admin");
+        navigate("/home");
       }
     } else {
       navigate("/login");
@@ -105,7 +106,7 @@ const ProfilePage = () => {
 
       setUser(res.data);
       localStorage.setItem("user", JSON.stringify(res.data));
-      window.dispatchEvent(new Event("wishlistupdate"));// navbar lai vanxa ki user ko data chnage vayo tesilay reload profile picture
+      window.dispatchEvent(new Event("wishlistUpdate"));// navbar lai vanxa ki user ko data chnage vayo tesilay reload profile picture
     } catch (err) {
       console.error("Photo upload failed:", err);
       setError(
@@ -210,8 +211,8 @@ const ProfilePage = () => {
               <label>Phone Number</label>
               {isEditing ? (
                 <input
-                 name ="phone number"
-                value= {formData.phone_number}
+                 name ="phone_number"
+                value= {formData.phone_number || ""}
                 onChange={handleChange}
                 className="profile-input"
               />
