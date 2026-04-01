@@ -23,7 +23,12 @@ from .views import (
     # payment verify
     KhaltiInitiateView,
     KhaltiVerifyView,
+    EsewaInitiateView,
+    EsewaVerifyView,
+    CashInHandBookingView,
     # HostNotificationCountView,
+    CancelBookingView,
+    BookingReceiptPDFView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -80,4 +85,30 @@ urlpatterns = [
     #     HostNotificationCountView.as_view(),
     #     name="host-notification-count",
     # ),
+    path(
+        "bookings/<int:booking_id>/cash-in-hand/",
+        CashInHandBookingView.as_view(),
+        name="cash-in-hand",
+    ),
+    path(
+        "bookings/<int:booking_id>/initiate-esewa/",
+        EsewaInitiateView.as_view(),
+        name="esewa-initiate",
+    ),
+    path(
+        "bookings/verify-esewa-payment/",
+        EsewaVerifyView.as_view(),
+        name="esewa-verify",
+    ),
+    # cancel and pdf
+    path(
+        "bookings/<int:booking_id>/cancel/",
+        CancelBookingView.as_view(),
+        name="cancel-booking",
+    ),
+    path(
+        "bookings/<int:booking_id>/receipt/",
+        BookingReceiptPDFView.as_view(),
+        name="booking-receipt-pdf",
+    ),
 ]

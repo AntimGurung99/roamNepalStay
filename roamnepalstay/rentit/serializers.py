@@ -312,6 +312,7 @@ class UserListSerializer(serializers.ModelSerializer):
             "last_login_at",
             "total_listings",
             "total_bookings",
+            "is_superuser",
         ]
 
     def get_full_name(self, obj):
@@ -614,6 +615,7 @@ class BookingListSerializer(serializers.ModelSerializer):
             "listing_image",
             "created_at",
             "updated_at",
+            "payment_method",
         ]
 
     def get_listing_image(self, obj):
@@ -682,6 +684,10 @@ class AdminStatsSerializer(serializers.Serializer):
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
     recent_bookings = BookingListSerializer(many=True)
     recent_reviews = ReviewListSerializer(many=True)
+    monthly_bookings = serializers.JSONField()
+    monthly_revenue = serializers.JSONField()
+    listings_by_type = serializers.JSONField()
+    host_application_status = serializers.JSONField()
 
 
 class ListingCreateSerializer(serializers.ModelSerializer):
@@ -771,6 +777,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             "total_nights",
             "status",
             "payment_status",
+            "payment_method",
             "created_at",
         ]
 
@@ -781,6 +788,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             "service_fee",
             "status",
             "payment_status",
+            "payment_method",
             "created_at",
         ]
 
@@ -912,7 +920,10 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "total_nights",
             "status",
             "payment_status",
+            "payment_method",
             "khalti_transaction_id",
+            "esewa_transaction_uuid",
+            "esewa_ref_id",
             "paid_at",
             "host_responded_at",
             "host_rejection_reasons",

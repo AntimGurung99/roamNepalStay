@@ -158,6 +158,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
+    "UPDATE_LAST_LOGIN": True,
 }
 
 
@@ -247,3 +248,20 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 KHALTI_SECRET_KEY = "c831d41cc43f4be088dc047b9f358ae7"
 KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/"
 KHALTI_VERIFY_URL = "https://a.khalti.com/api/v2/epayment/lookup/"
+
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# KHALTI_SECRET_KEY = os.getenv("KHALTI_SECRET_KEY", "")
+# KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/"
+# KHALTI_VERIFY_URL = "https://a.khalti.com/api/v2/epayment/lookup/"
+
+ESEWA_PRODUCT_CODE = os.getenv("ESEWA_PRODUCT_CODE", "EPAYTEST")
+ESEWA_SECRET_KEY = os.getenv("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
+ESEWA_FORM_URL = os.getenv(
+    "ESEWA_FORM_URL", "https://rc-epay.esewa.com.np/api/epay/main/v2/form"
+)
+ESEWA_STATUS_CHECK_URL = os.getenv(
+    "ESEWA_STATUS_CHECK_URL",
+    "https://rc.esewa.com.np/api/epay/transaction/status/",
+)

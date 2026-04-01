@@ -297,13 +297,18 @@ class ListingImage(models.Model):
         ordering = ["-is_primary", "uploaded_at"]
 
 
-# sabai booking details haru store garna hunxa
 # class Booking(models.Model):
 #     class Status(models.TextChoices):
 #         PENDING = "pending", "Pending"
 #         CONFIRMED = "confirmed", "Confirmed"
+#         PAID = "paid", "Paid"
 #         CANCELLED = "cancelled", "Cancelled"
 #         COMPLETED = "completed", "Completed"
+
+#     class PaymentStatus(models.TextChoices):
+#         UNPAID = "unpaid", "Unpaid"
+#         PAID = "paid", "Paid"
+#         FAILED = "failed", "Failed"
 
 #     # Booking parties
 #     guest = models.ForeignKey(
@@ -312,15 +317,15 @@ class ListingImage(models.Model):
 #     listing = models.ForeignKey(
 #         Listing, on_delete=models.CASCADE, related_name="bookings"
 #     )
-
 #     # Booking details
 #     check_in = models.DateField()
 #     check_out = models.DateField()
 #     guests_count = models.PositiveIntegerField()
+#     special_requests = models.TextField(blank=True)
 
 #     # Pricing
 #     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-#     cleaning_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+#     cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 #     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 
 #     # Status
@@ -328,15 +333,29 @@ class ListingImage(models.Model):
 #         max_length=20, choices=Status.choices, default=Status.PENDING
 #     )
 
-#     # Special requests
-#     special_requests = models.TextField(blank=True)
+#     # new payment for track ganruh
+#     payment_status = models.CharField(
+#         max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID
+#     )
 
-#     # Timestamps
+#     khalti_token = models.CharField(max_length=255, blank=True, null=True)
+#     khalti_transaction_id = models.CharField(max_length=255, blank=True, null=True)
+#     paid_at = models.DateTimeField(null=True, blank=True)
+
+#     # host ko response track garnih
+#     host_responded_at = models.DateTimeField(null=True, blank=True)
+#     host_rejection_reasons = models.TextField(blank=True)
+
+#     # Timestamp
 #     created_at = models.DateTimeField(auto_now_add=True)
 #     updated_at = models.DateTimeField(auto_now=True)
 
 #     def __str__(self):
 #         return f"Booking {self.id} - {self.listing.title}"
+
+#     @property
+#     def total_nights(self):
+#         return (self.check_out - self.check_in).days
 
 #     class Meta:
 #         ordering = ["-created_at"]
@@ -355,43 +374,53 @@ class Booking(models.Model):
         PAID = "paid", "Paid"
         FAILED = "failed", "Failed"
 
-    # Booking parties
+    class PaymentMethod(models.TextChoices):
+        KHALTI = "khalti", "Khalti"
+        ESEWA = "esewa", "eSewa"
+        CASH_IN_HAND = "cash_in_hand", "Cash in Hand"
+
     guest = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
     )
     listing = models.ForeignKey(
         Listing, on_delete=models.CASCADE, related_name="bookings"
     )
-    # Booking details
+
     check_in = models.DateField()
     check_out = models.DateField()
     guests_count = models.PositiveIntegerField()
     special_requests = models.TextField(blank=True)
 
-    # Pricing
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 
-    # Status
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PENDING
     )
 
-    # new payment for track ganruh
     payment_status = models.CharField(
         max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID
     )
 
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        blank=True,
+        null=True,
+    )
+
     khalti_token = models.CharField(max_length=255, blank=True, null=True)
     khalti_transaction_id = models.CharField(max_length=255, blank=True, null=True)
+
+    esewa_transaction_uuid = models.CharField(max_length=120, blank=True, null=True)
+    esewa_ref_id = models.CharField(max_length=255, blank=True, null=True)
+
     paid_at = models.DateTimeField(null=True, blank=True)
 
-    # host ko response track garnih
     host_responded_at = models.DateTimeField(null=True, blank=True)
     host_rejection_reasons = models.TextField(blank=True)
 
-    # Timestamp
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
