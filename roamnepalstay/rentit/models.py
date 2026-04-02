@@ -4,6 +4,8 @@ from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
 from django.db.models import Q
 from django.utils import timezone
+from decimal import Decimal
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class UserManager(BaseUserManager):
@@ -363,6 +365,7 @@ class ListingImage(models.Model):
 
 class Booking(models.Model):
     class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
         PENDING = "pending", "Pending"
         CONFIRMED = "confirmed", "Confirmed"
         PAID = "paid", "Paid"
@@ -394,6 +397,9 @@ class Booking(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    room_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    host_payout = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    superadmin_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
 
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PENDING
@@ -492,3 +498,28 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.listing.title}"
+
+
+class PlatformSetting(models.Model):
+    site_name = models.CharField(max_length=100, default="RoamNepalStay")
+    service_fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=5.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "Platform Settings"
+
+    @classmethod
+    def get_settings(cls):
+        obj, created = cls.objects.get_or_create(
+            id=1,
+            defaults={
+                "site_name": "RoamNepalStay",
+                "service_fee_percent": Decimal("5.00"),
+            },
+        )
+        return obj

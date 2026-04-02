@@ -29,6 +29,12 @@ from .views import (
     # HostNotificationCountView,
     CancelBookingView,
     BookingReceiptPDFView,
+    # for view
+    BookingReviewCreateView,
+    # split revenue
+    PlatformSettingAPIView,
+    HostAnalyticsView,
+    PublicPlatformFeeAPIView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -69,6 +75,11 @@ urlpatterns = [
     path("bookings/", BookingCreateView.as_view(), name="booking-create"),
     path("bookings/my/", BookingListView.as_view(), name="booking-list"),
     path("bookings/<int:pk>/", BookingsDetailsView.as_view(), name="booking-list"),
+    path(
+        "bookings/<int:booking_id>/review/",
+        BookingReviewCreateView.as_view(),
+        name="booking-review-create",
+    ),
     # payments
     path(
         "bookings/<int:booking_id>/initiate-payment/",
@@ -80,11 +91,6 @@ urlpatterns = [
         KhaltiVerifyView.as_view(),
         name="khalti-verify",
     ),
-    # path(
-    #     "host/notifications/count/",
-    #     HostNotificationCountView.as_view(),
-    #     name="host-notification-count",
-    # ),
     path(
         "bookings/<int:booking_id>/cash-in-hand/",
         CashInHandBookingView.as_view(),
@@ -110,5 +116,15 @@ urlpatterns = [
         "bookings/<int:booking_id>/receipt/",
         BookingReceiptPDFView.as_view(),
         name="booking-receipt-pdf",
+    ),
+    # split income host and super admin
+    path(
+        "platform-settings/", PlatformSettingAPIView.as_view(), name="platform-settings"
+    ),
+    path("host/analytics/", HostAnalyticsView.as_view(), name="host-analytics"),
+    path(
+        "public/platform-fee/",
+        PublicPlatformFeeAPIView.as_view(),
+        name="public-platform-fee",
     ),
 ]

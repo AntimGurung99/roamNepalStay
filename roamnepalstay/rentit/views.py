@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from django.utils.http import urlencode
-
+from .permissions import IsAdminUserRole
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -45,7 +45,10 @@ from .models import (
     PendingRegistration,
     Review,
     Wishlist,
+    PlatformSetting,
 )
+
+from decimal import Decimal, ROUND_HALF_UP
 from .permissions import IsAdminUserRole
 from .serializers import (
     AdminStatsSerializer,
@@ -61,13 +64,16 @@ from .serializers import (
     RegisterResponseSerializer,
     RegisterSerializer,
     ResendOTPSerializer,
-    ReviewListSerializer,
     UserDetailSerializer,
     UserListSerializer,
     VerifyOTPSerializer,
     WishlistSerializer,
+    ReviewCreateSerializer,
+    AdminReviewListSerializer,
+    PublicReviewSerializer,
+    PlatformSettingSerializer,
 )
-from .utils import generate_otp, send_otp_email
+from .utils import generate_otp, send_otp_email, send_booking_confirmation_emails
 
 User = get_user_model()
 
@@ -289,10 +295,16 @@ class AdminDashboardViewSet(GenericViewSet):
         ).count()
         pending_listings = Listing.objects.filter(status="pending").count()
 
+        # total_revenue = (
+        #     Booking.objects.filter(
+        #         status__in=["confirmed", "paid", "completed"]
+        #     ).aggregate(total=Sum("total_amount"))["total"]
+        #     or 0
+        # )
         total_revenue = (
             Booking.objects.filter(
                 status__in=["confirmed", "paid", "completed"]
-            ).aggregate(total=Sum("total_amount"))["total"]
+            ).aggregate(total=Sum("superadmin_revenue"))["total"]
             or 0
         )
 
@@ -322,11 +334,19 @@ class AdminDashboardViewSet(GenericViewSet):
         ]
 
         # 2. Monthly revenue
+        # monthly_revenue_qs = (
+        #     Booking.objects.filter(status__in=["confirmed", "paid", "completed"])
+        #     .annotate(month=TruncMonth("created_at"))
+        #     .values("month")
+        #     .annotate(revenue=Sum("total_amount"))
+        #     .order_by("month")
+        # )
+
         monthly_revenue_qs = (
             Booking.objects.filter(status__in=["confirmed", "paid", "completed"])
             .annotate(month=TruncMonth("created_at"))
             .values("month")
-            .annotate(revenue=Sum("total_amount"))
+            .annotate(revenue=Sum("superadmin_revenue"))
             .order_by("month")
         )
 
@@ -657,7 +677,7 @@ class AdminBookingViewSet(GenericViewSet):
     def list(self, request):
         bookings = Booking.objects.select_related(
             "guest", "listing", "listing__host"
-        ).order_by("-created_at")
+        ).exclude(status=Booking.Status.DRAFT).order_by("-created_at")
         status_filter = request.query_params.get("status", "")
         if status_filter:
             bookings = bookings.filter(status=status_filter)
@@ -689,10 +709,10 @@ class AdminReviewViewSet(GenericViewSet):
             reviews = reviews.filter(is_approved=False)
         page = self.paginate_queryset(reviews)
         if page is not None:
-            serializer = ReviewListSerializer(page, many=True)
+            serializer = AdminReviewListSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = ReviewListSerializer(reviews, many=True)
+        serializer = AdminReviewListSerializer(reviews, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
@@ -742,6 +762,20 @@ class ListingViewSet(GenericViewSet):
 
     def list(self, request):
         listings = Listing.objects.filter(status="published").order_by("-created_at")
+
+        search = request.query_params.get("search", "").strip()
+        if search:
+            listings = listings.filter(
+                Q(title__icontains=search)
+                | Q(city__icontains=search)
+                | Q(district__icontains=search)
+                | Q(region__icontains=search)
+                | Q(province__icontains=search)
+                | Q(category__icontains=search)
+                | Q(property_type__icontains=search)
+                | Q(description__icontains=search)
+            )
+
         serializer = ListingListSerializer(
             listings, many=True, context={"request": request}
         )
@@ -822,6 +856,14 @@ class ListingViewSet(GenericViewSet):
             Wishlist.objects.create(user=request.user, listing=listing)
             return Response({"is_wishlisted": True, "detail": "Added to wishlist."})
 
+    @action(detail=True, methods=["get"])
+    def booked_dates(self, request, pk=None):
+        listing = self.get_object()
+        bookings = Booking.objects.filter(
+            listing=listing, status__in=["confirmed", "paid", "completed"]
+        ).values("check_in", "check_out")
+        return Response(list(bookings))
+
     @action(detail=False, methods=["get"])
     def my_listings(self, request):
         listings = Listing.objects.filter(host=request.user).order_by("-created_at")
@@ -850,69 +892,181 @@ def generate_esewa_signature(total_amount, transaction_uuid, product_code):
     return signature
 
 
+# class BookingCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         serializer = BookingCreateSerializer(data=request.data)
+#         if not serializer.is_valid():
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#         listing = serializer.validated_data["listing"]
+#         check_in = serializer.validated_data["check_in"]
+#         check_out = serializer.validated_data["check_out"]
+
+#         nights = Decimal((check_out - check_in).days)
+#         price_per_night = Decimal(listing.price_per_night)
+#         cleaning_fee = Decimal(listing.cleaning_fee or 0)
+#         service_fee = (price_per_night * nights * Decimal("0.05")).quantize(
+#             Decimal("0.01")
+#         )
+#         total_amount = (price_per_night * nights + cleaning_fee + service_fee).quantize(
+#             Decimal("0.01")
+#         )
+
+#         booking = serializer.save(
+#             guest=request.user,
+#             total_amount=total_amount,
+#             cleaning_fee=cleaning_fee,
+#             service_fee=service_fee,
+#             status="pending",
+#             payment_status="unpaid",
+#         )
+
+#         try:
+#             host = listing.host
+#             send_mail(
+#                 subject=f"RoamNepalStay - New Booking for {listing.title}",
+#                 message=(
+#                     f"Hi {host.first_name},\n\n"
+#                     f"You have a new booking for your property: {listing.title}.\n"
+#                     f"- Guest: {request.user.first_name} {request.user.last_name}\n"
+#                     f"- Dates: {check_in} to {check_out}\n"
+#                     f"- Total Amount: Rs. {total_amount}\n\n"
+#                     f"Regards,\nRoamNepalStay"
+#                 ),
+#                 from_email=settings.DEFAULT_FROM_EMAIL,
+#                 recipient_list=[host.email],
+#                 fail_silently=True,
+#             )
+#             send_mail(
+#                 subject=f"RoamNepalStay - Booking Created for {listing.title}",
+#                 message=(
+#                     f"Hi {request.user.first_name},\n\n"
+#                     f"Your booking for {listing.title} has been created successfully!\n"
+#                     f"- Dates: {check_in} to {check_out}\n"
+#                     f"- Total Amount: Rs. {total_amount}\n\n"
+#                     f"Please proceed to payment.\n\n"
+#                     f"Regards,\nRoamNepalStay"
+#                 ),
+#                 from_email=settings.DEFAULT_FROM_EMAIL,
+#                 recipient_list=[request.user.email],
+#                 fail_silently=True,
+#             )
+#         except Exception as e:
+#             print(f"Error sending emails: {e}")
+
+#         return Response(
+#             BookingDetailSerializer(booking, context={"request": request}).data,
+#             status=status.HTTP_201_CREATED,
+#         )
+from decimal import Decimal, ROUND_HALF_UP
+from django.conf import settings
+from django.core.mail import send_mail
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import PlatformSetting
+from .serializers import BookingCreateSerializer, BookingDetailSerializer
+
+
 class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         listing = serializer.validated_data["listing"]
         check_in = serializer.validated_data["check_in"]
         check_out = serializer.validated_data["check_out"]
 
+        if check_out <= check_in:
+            return Response(
+                {"detail": "Check-out date must be after check-in date."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         nights = Decimal((check_out - check_in).days)
-        price_per_night = Decimal(listing.price_per_night)
-        cleaning_fee = Decimal(listing.cleaning_fee or 0)
-        service_fee = (price_per_night * nights * Decimal("0.05")).quantize(
-            Decimal("0.01")
+
+        if nights <= 0:
+            return Response(
+                {"detail": "Booking must be at least 1 night."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Optional extra protection: stop host booking own property
+        if listing.host == request.user:
+            return Response(
+                {"detail": "You cannot book your own property."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Optional extra protection: allow only published listings
+        if getattr(listing, "status", None) != "published":
+            return Response(
+                {"detail": "This property is not available for booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Optional extra protection: prevent overlapping bookings
+        overlapping_booking_exists = listing.bookings.filter(
+            check_in__lt=check_out,
+            check_out__gt=check_in,
+            status__in=["pending", "confirmed", "paid", "completed"],
+        ).exists()
+
+        if overlapping_booking_exists:
+            return Response(
+                {"detail": "Selected dates are already booked."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        platform_settings = PlatformSetting.get_settings()
+
+        price_per_night = Decimal(listing.price_per_night).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
-        total_amount = (price_per_night * nights + cleaning_fee + service_fee).quantize(
-            Decimal("0.01")
+
+        room_subtotal = (price_per_night * nights).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
+
+        cleaning_fee = Decimal(listing.cleaning_fee or 0).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        service_fee_percent = Decimal(
+            platform_settings.service_fee_percent or 0
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        service_fee = ((room_subtotal * service_fee_percent) / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        total_amount = (room_subtotal + cleaning_fee + service_fee).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        host_payout = (room_subtotal + cleaning_fee).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        superadmin_revenue = service_fee
 
         booking = serializer.save(
             guest=request.user,
-            total_amount=total_amount,
+            room_subtotal=room_subtotal,
             cleaning_fee=cleaning_fee,
             service_fee=service_fee,
-            status="pending",
-            payment_status="unpaid",
+            total_amount=total_amount,
+            host_payout=host_payout,
+            superadmin_revenue=superadmin_revenue,
+            status=Booking.Status.DRAFT,
+            payment_status=Booking.PaymentStatus.UNPAID,
         )
-
-        try:
-            host = listing.host
-            send_mail(
-                subject=f"RoamNepalStay - New Booking for {listing.title}",
-                message=(
-                    f"Hi {host.first_name},\n\n"
-                    f"You have a new booking for your property: {listing.title}.\n"
-                    f"- Guest: {request.user.first_name} {request.user.last_name}\n"
-                    f"- Dates: {check_in} to {check_out}\n"
-                    f"- Total Amount: Rs. {total_amount}\n\n"
-                    f"Regards,\nRoamNepalStay"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[host.email],
-                fail_silently=True,
-            )
-            send_mail(
-                subject=f"RoamNepalStay - Booking Created for {listing.title}",
-                message=(
-                    f"Hi {request.user.first_name},\n\n"
-                    f"Your booking for {listing.title} has been created successfully!\n"
-                    f"- Dates: {check_in} to {check_out}\n"
-                    f"- Total Amount: Rs. {total_amount}\n\n"
-                    f"Please proceed to payment.\n\n"
-                    f"Regards,\nRoamNepalStay"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[request.user.email],
-                fail_silently=True,
-            )
-        except Exception as e:
-            print(f"Error sending emails: {e}")
 
         return Response(
             BookingDetailSerializer(booking, context={"request": request}).data,
@@ -920,11 +1074,29 @@ class BookingCreateView(APIView):
         )
 
 
+
+# class BookingListView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         bookings = Booking.objects.filter(guest=request.user).order_by("-created_at")
+#         serializer = BookingDetailSerializer(
+#             bookings, many=True, context={"request": request}
+#         )
+#         return Response(serializer.data)
+
+
 class BookingListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        bookings = Booking.objects.filter(guest=request.user).order_by("-created_at")
+        Booking.objects.filter(
+            guest=request.user,
+            check_out__lt=timezone.now().date(),
+            status__in=["confirmed", "paid"],
+        ).update(status="completed")
+
+        bookings = Booking.objects.filter(guest=request.user).exclude(status=Booking.Status.DRAFT).order_by("-created_at")
         serializer = BookingDetailSerializer(
             bookings, many=True, context={"request": request}
         )
@@ -945,11 +1117,46 @@ class BookingsDetailsView(APIView):
             )
 
 
+class BookingReviewCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, booking_id):
+        try:
+            booking = Booking.objects.get(pk=booking_id, guest=request.user)
+        except Booking.DoesNotExist:
+            return Response(
+                {"detail": "Booking not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = request.data.copy()
+        data["booking"] = booking.id
+
+        serializer = ReviewCreateSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        if serializer.is_valid():
+            review = serializer.save()
+            return Response(
+                {
+                    "detail": "Review submitted successfully.",
+                    "review": PublicReviewSerializer(
+                        review, context={"request": request}
+                    ).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class HostBookingViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        bookings = Booking.objects.filter(listing__host=request.user).order_by(
+        bookings = Booking.objects.filter(listing__host=request.user).exclude(status=Booking.Status.DRAFT).order_by(
             "-created_at"
         )
         status_filter = request.query_params.get("status", "")
@@ -990,6 +1197,10 @@ class CashInHandBookingView(APIView):
         booking.status = Booking.Status.CONFIRMED
         booking.save()
 
+        send_booking_confirmation_emails(booking)
+
+
+
         return Response(
             {
                 "detail": "Cash in hand selected successfully.",
@@ -999,6 +1210,87 @@ class CashInHandBookingView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# class KhaltiInitiateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, booking_id):
+#         try:
+#             booking = Booking.objects.get(pk=booking_id, guest=request.user)
+#         except Booking.DoesNotExist:
+#             return Response(
+#                 {"detail": "Booking not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#         if booking.payment_status == "paid":
+#             return Response(
+#                 {"detail": "This booking is already paid."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         if booking.status in ["cancelled", "completed"]:
+#             return Response(
+#                 {"detail": f"Cannot pay for a booking that is {booking.status}."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         amount_in_paisa = int(float(booking.total_amount) * 100)
+
+#         payload = {
+#             "return_url": f"{settings.FRONTEND_URL}/booking/payment-success/?provider=khalti",
+#             "website_url": settings.FRONTEND_URL,
+#             "amount": amount_in_paisa,
+#             "purchase_order_id": str(booking.id),
+#             "purchase_order_name": f"Booking for {booking.listing.title}",
+#             "customer_info": {
+#                 "name": f"{request.user.first_name} {request.user.last_name}",
+#                 "email": request.user.email,
+#                 "phone": request.user.phone_number or "9800000000",
+#             },
+#         }
+
+#         headers = {
+#             "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
+#             "Content-Type": "application/json",
+#         }
+
+#         try:
+#             response = requests.post(
+#                 settings.KHALTI_INITIATE_URL,
+#                 json=payload,
+#                 headers=headers,
+#                 timeout=30,
+#             )
+#             khalti_data = response.json()
+
+#             if response.status_code == 200:
+#                 booking.khalti_token = khalti_data.get("pidx")
+#                 booking.payment_method = Booking.PaymentMethod.KHALTI
+#                 booking.save()
+
+#                 return Response(
+#                     {
+#                         "payment_url": khalti_data.get("payment_url"),
+#                         "pidx": khalti_data.get("pidx"),
+#                         "booking_id": booking.id,
+#                     }
+#                 )
+
+#             return Response(
+#                 {
+#                     "detail": "Failed to initiate Khalti payment.",
+#                     "khalti_details": khalti_data,
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         except Exception as e:
+#             return Response(
+#                 {"detail": f"Khalti payment error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
 
 
 class KhaltiInitiateView(APIView):
@@ -1013,28 +1305,30 @@ class KhaltiInitiateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if booking.payment_status == "paid":
+        if booking.payment_status == Booking.PaymentStatus.PAID:
             return Response(
                 {"detail": "This booking is already paid."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if booking.status in ["cancelled", "completed"]:
+        if booking.status in [Booking.Status.CANCELLED, Booking.Status.COMPLETED]:
             return Response(
                 {"detail": f"Cannot pay for a booking that is {booking.status}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        amount_in_paisa = int(float(booking.total_amount) * 100)
+        amount_in_paisa = int(
+            (Decimal(booking.total_amount).quantize(Decimal("0.01")) * 100)
+        )
 
         payload = {
-            "return_url": f"{settings.FRONTEND_URL}/booking/payment-success/?provider=khalti",
+            "return_url": f"{settings.FRONTEND_URL}/booking/payment-success/?provider=khalti&booking_id={booking.id}",
             "website_url": settings.FRONTEND_URL,
             "amount": amount_in_paisa,
             "purchase_order_id": str(booking.id),
-            "purchase_order_name": f"Booking for {booking.listing.title}",
+            "purchase_order_name": f"Booking #{booking.id} - {booking.listing.title}",
             "customer_info": {
-                "name": f"{request.user.first_name} {request.user.last_name}",
+                "name": f"{request.user.first_name} {request.user.last_name}".strip(),
                 "email": request.user.email,
                 "phone": request.user.phone_number or "9800000000",
             },
@@ -1052,19 +1346,29 @@ class KhaltiInitiateView(APIView):
                 headers=headers,
                 timeout=30,
             )
+
             khalti_data = response.json()
 
-            if response.status_code == 200:
+            if response.status_code == 200 and khalti_data.get("pidx"):
                 booking.khalti_token = khalti_data.get("pidx")
                 booking.payment_method = Booking.PaymentMethod.KHALTI
-                booking.save()
+                booking.payment_status = Booking.PaymentStatus.UNPAID
+                booking.save(
+                    update_fields=[
+                        "khalti_token",
+                        "payment_method",
+                        "payment_status",
+                        "updated_at",
+                    ]
+                )
 
                 return Response(
                     {
                         "payment_url": khalti_data.get("payment_url"),
                         "pidx": khalti_data.get("pidx"),
                         "booking_id": booking.id,
-                    }
+                    },
+                    status=status.HTTP_200_OK,
                 )
 
             return Response(
@@ -1075,13 +1379,97 @@ class KhaltiInitiateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except Exception as e:
+        except requests.RequestException as e:
             return Response(
                 {"detail": f"Khalti payment error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
+# class KhaltiVerifyView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         pidx = request.data.get("pidx")
+#         booking_id = request.data.get("booking_id")
+
+#         if not pidx or not booking_id:
+#             return Response(
+#                 {"detail": "pidx and booking_id are required."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         try:
+#             booking = Booking.objects.get(pk=booking_id, guest=request.user)
+#         except Booking.DoesNotExist:
+#             return Response(
+#                 {"detail": "Booking not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#         headers = {
+#             "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
+#             "Content-Type": "application/json",
+#         }
+
+#         try:
+#             response = requests.post(
+#                 settings.KHALTI_VERIFY_URL,
+#                 json={"pidx": pidx},
+#                 headers=headers,
+#                 timeout=30,
+#             )
+#             khalti_data = response.json()
+
+#             if response.status_code == 200 and khalti_data.get("status") == "Completed":
+#                 booking.payment_status = Booking.PaymentStatus.PAID
+#                 booking.status = Booking.Status.PAID
+#                 booking.payment_method = Booking.PaymentMethod.KHALTI
+#                 booking.khalti_transaction_id = khalti_data.get("transaction_id")
+#                 booking.paid_at = timezone.now()
+#                 booking.save()
+
+#                 host = booking.listing.host
+#                 send_mail(
+#                     subject=f"New Paid Booking - {booking.listing.title}",
+#                     message=(
+#                         f"Hi {host.first_name},\n\n"
+#                         f"You have a new paid booking!\n"
+#                         f"Property: {booking.listing.title}\n"
+#                         f"Dates: {booking.check_in} to {booking.check_out}\n\n"
+#                         f"Regards,\nRoamNepalStay"
+#                     ),
+#                     from_email=settings.DEFAULT_FROM_EMAIL,
+#                     recipient_list=[host.email],
+#                     fail_silently=True,
+#                 )
+
+#                 return Response(
+#                     {
+#                         "detail": "Khalti payment verified successfully.",
+#                         "booking": BookingDetailSerializer(
+#                             booking, context={"request": request}
+#                         ).data,
+#                     }
+#                 )
+
+#             booking.payment_status = Booking.PaymentStatus.FAILED
+#             booking.save()
+
+#             return Response(
+#                 {
+#                     "detail": "Khalti payment verification failed.",
+#                     "khalti_details": khalti_data,
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+
+#         except Exception as e:
+#             return Response(
+#                 {"detail": f"Khalti verification error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
 class KhaltiVerifyView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1103,6 +1491,12 @@ class KhaltiVerifyView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if booking.khalti_token and booking.khalti_token != pidx:
+            return Response(
+                {"detail": "Invalid payment reference for this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         headers = {
             "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
             "Content-Type": "application/json",
@@ -1115,30 +1509,32 @@ class KhaltiVerifyView(APIView):
                 headers=headers,
                 timeout=30,
             )
+
             khalti_data = response.json()
 
-            if response.status_code == 200 and khalti_data.get("status") == "Completed":
+            expected_amount = int(
+                (Decimal(booking.total_amount).quantize(Decimal("0.01")) * 100)
+            )
+            khalti_amount = int(khalti_data.get("total_amount") or 0)
+
+            if (
+                response.status_code == 200
+                and khalti_data.get("status") == "Completed"
+                and khalti_amount == expected_amount
+            ):
                 booking.payment_status = Booking.PaymentStatus.PAID
                 booking.status = Booking.Status.PAID
                 booking.payment_method = Booking.PaymentMethod.KHALTI
-                booking.khalti_transaction_id = khalti_data.get("transaction_id")
+                booking.khalti_token = pidx
+                booking.khalti_transaction_id = (
+                    khalti_data.get("transaction_id")
+                    or khalti_data.get("txnId")
+                    or khalti_data.get("tidx")
+                )
                 booking.paid_at = timezone.now()
                 booking.save()
 
-                host = booking.listing.host
-                send_mail(
-                    subject=f"New Paid Booking - {booking.listing.title}",
-                    message=(
-                        f"Hi {host.first_name},\n\n"
-                        f"You have a new paid booking!\n"
-                        f"Property: {booking.listing.title}\n"
-                        f"Dates: {booking.check_in} to {booking.check_out}\n\n"
-                        f"Regards,\nRoamNepalStay"
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[host.email],
-                    fail_silently=True,
-                )
+                send_booking_confirmation_emails(booking)
 
                 return Response(
                     {
@@ -1146,11 +1542,12 @@ class KhaltiVerifyView(APIView):
                         "booking": BookingDetailSerializer(
                             booking, context={"request": request}
                         ).data,
-                    }
+                    },
+                    status=status.HTTP_200_OK,
                 )
 
             booking.payment_status = Booking.PaymentStatus.FAILED
-            booking.save()
+            booking.save(update_fields=["payment_status", "updated_at"])
 
             return Response(
                 {
@@ -1160,7 +1557,7 @@ class KhaltiVerifyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except Exception as e:
+        except requests.RequestException as e:
             return Response(
                 {"detail": f"Khalti verification error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1304,6 +1701,8 @@ class EsewaVerifyView(APIView):
                 )
                 booking.paid_at = timezone.now()
                 booking.save()
+
+                send_booking_confirmation_emails(booking)
 
                 return Response(
                     {
@@ -1728,3 +2127,85 @@ class BookingReceiptPDFView(APIView):
         p.showPage()
         p.save()
         return response
+
+
+class PlatformSettingAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
+
+    def get(self, request):
+        settings_obj = PlatformSetting.get_settings()
+        serializer = PlatformSettingSerializer(settings_obj)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        if not request.user.is_superuser:
+            return Response(
+                {"detail": "Only superadmin can update platform settings."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        settings_obj = PlatformSetting.get_settings()
+        serializer = PlatformSettingSerializer(
+            settings_obj, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+# net number to host direcly
+class HostAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        bookings = Booking.objects.filter(listing__host=request.user)
+
+        total_bookings = bookings.count()
+        paid_bookings = bookings.filter(payment_status="paid").count()
+        unpaid_bookings = bookings.exclude(payment_status="paid").count()
+
+        gross_guest_total = bookings.filter(payment_status="paid").aggregate(
+            total=Sum("total_amount")
+        )["total"] or Decimal("0.00")
+
+        total_host_payout = bookings.filter(payment_status="paid").aggregate(
+            total=Sum("host_payout")
+        )["total"] or Decimal("0.00")
+
+        total_platform_fee = bookings.filter(payment_status="paid").aggregate(
+            total=Sum("superadmin_revenue")
+        )["total"] or Decimal("0.00")
+
+        property_counts = (
+            bookings.values("listing__title")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        if property_counts:
+            most_booked_property = property_counts[0]["listing__title"]
+        else:
+            most_booked_property = "No bookings yet"
+
+        return Response(
+            {
+                "total_bookings": total_bookings,
+                "paid_bookings": paid_bookings,
+                "unpaid_bookings": unpaid_bookings,
+                "gross_guest_total": gross_guest_total,
+                "host_net_revenue": total_host_payout,
+                "platform_revenue": total_platform_fee,
+                "most_booked_property": most_booked_property,
+            }
+        )
+
+
+# check out page lay dynamically handke garnu
+
+
+class PublicPlatformFeeAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        settings_obj = PlatformSetting.get_settings()
+        return Response({"service_fee_percent": settings_obj.service_fee_percent})

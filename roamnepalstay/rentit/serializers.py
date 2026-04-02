@@ -5,114 +5,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 import re
 from .models import Listing, ListingImage, HostApplication, Booking, Review, Wishlist
-
+from django.utils import timezone
+from django.db.models import Avg
+from .models import PlatformSetting, Booking
 
 User = get_user_model()
-
-
-# class RegisterSerializer(serializers.ModelSerializer):
-# email = serializers.EmailField(
-#     required=True, error_messages={"invalid": "Enter a valid email address"}
-# )
-# password = serializers.CharField(write_only= True, required = True)
-# confirm_password = serializers.CharField(write_only=True)
-
-# class Meta:
-#     model = User
-#     fields = (
-#         "first_name",
-#         "last_name",
-#         "email",
-#         "password",
-#         "confirm_password",
-#         "phone_number",
-#         "profile_image",
-#         "date_of_birth",
-#         "city",
-#         "country",
-#         "accepted_terms",
-#     )
-#     extra_kwargs = {"password": {"write_only": True}}
-
-# def validate(self, attrs):
-#     first_name = (attrs.get("first_name") or "").strip()
-#     last_name = (attrs.get("last_name") or "").strip()
-#     email = (attrs.get("email") or "").strip().lower()
-#     password = attrs.get("password")
-#     confirm_password = attrs.get("confirm_password")
-
-#     if not first_name:
-#         raise serializers.ValidationError(
-#             {"first_name": ["First name is required."]}
-#         )
-#     if not last_name:
-#         raise serializers.ValidationError({"last_name": ["Last name is required."]})
-#     if not email:
-#         raise serializers.ValidationError({"email": ["Email is required."]})
-#     if not confirm_password:
-#         raise serializers.ValidationError(
-#             {"confirm_password": ["Confirm password is required."]}
-#         )
-#     # password check
-#     if password != confirm_password:
-#         raise serializers.ValidationError(
-#             {"confirm_password": ["Passwords do not match."]}
-#         )
-
-#     try:
-#         validate_password(password)
-#     except DjangoValidationError as e:
-#         raise serializers.ValidationError({"password": e.messages})
-#     # Built=in email format validation
-#     try:
-#         validate_email(email)
-#     except DjangoValidationError:
-#         raise serializers.ValidationError({"email": "Enter a valid email address."})
-
-#     # Extra strict validation()
-#     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-#     if not re.match(email_regex, email):
-#         raise serializers.ValidationError({"email": "Invalid email format."})
-#     # prevent numeric only usernames
-#     local_part = email.split("@")[0]
-#     if local_part.isdigit():
-#         raise serializers.ValidationError(
-#             {"email": "Email cannot start with only numbers."}
-#         )
-
-#     # email uniqueness
-#     if User.objects.filter(email__iexact=email).exists():
-#         raise serializers.ValidationError({"email": "Email already exists."})
-
-#     # terms acceptance
-#     if attrs.get("accepted_terms") is not True:
-#         raise serializers.ValidationError(
-#             {"accepted_terms": "You must accepts and conditions."}
-#         )
-
-# if User.objects.filter(
-#     first_name__iexact=first_name, last_name__iexact=last_name
-# ).exists():
-#     raise serializers.ValidationError({"name": ["Same name already exists."]})
-#     attrs["first_name"] = first_name
-#     attrs["last_name"] = last_name
-#     attrs["email"] = email
-#     return attrs
-
-# def create(self, validated_data):
-#     validated_data.pop("confirm_password")
-
-#     user = User.objects.create_user(
-#         email=validated_data["email"],
-#         password=validated_data["password"],
-#         first_name=validated_data["first_name"],
-#         last_name=validated_data["last_name"],
-#         phone_number=validated_data.get("phone_number"),
-#         city=validated_data.get("city"),
-#         country=validated_data.get("country"),
-#         date_of_birth = validated_data.get("date_of_birth"),
-#         accepted_terms=validated_data.get("accepted_terms"),
-#     )
 
 
 #     return user
@@ -468,12 +365,140 @@ class ListingListSerializer(serializers.ModelSerializer):
 
 
 # listing ko detail dekhauna ko lagi
+# class ListingDetailSerializer(serializers.ModelSerializer):
+#     host_name = serializers.SerializerMethodField()
+#     images = ListingImageSerializer(many=True, read_only=True)
+#     moderated_by_name = serializers.SerializerMethodField()
+#     amenities = serializers.SerializerMethodField()
+#     is_wishlisted = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Listing
+#         fields = [
+#             "id",
+#             "title",
+#             "description",
+#             "highlight",
+#             "highlight_details",
+#             "property_type",
+#             "city",
+#             "district",
+#             "address",
+#             "latitude",
+#             "longitude",
+#             "bedrooms",
+#             "bathrooms",
+#             "max_guests",
+#             "price_per_night",
+#             "cleaning_fee",
+#             "wifi",
+#             "parking",
+#             "kitchen",
+#             "air_conditioning",
+#             "heating",
+#             "bath_tub",
+#             "personal_care",
+#             "outdoor_shower",
+#             "washer",
+#             "dryer",
+#             "hangers",
+#             "iron",
+#             "tv",
+#             "dedicated_workspace",
+#             "security_cameras",
+#             "fire_extinguisher",
+#             "first_aid",
+#             "cooking_set",
+#             "refrigerator",
+#             "microwave",
+#             "stove",
+#             "barbecue_grill",
+#             "outdoor_dining_area",
+#             "private_patio_or_balcony",
+#             "camp_fire",
+#             "garden",
+#             "free_parking",
+#             "self_check_in",
+#             "pet_allowed",
+#             "category",
+#             "beds",
+#             "apt_suite",
+#             "province",
+#             "region",
+#             "country",
+#             "status",
+#             "host",
+#             "host_name",
+#             "images",
+#             "moderated_by",
+#             "moderated_by_name",
+#             "moderation_reason",
+#             "moderated_at",
+#             "created_at",
+#             "updated_at",
+#             "amenities",
+#             "is_wishlisted",
+#         ]
+
+#     def get_is_wishlisted(self, obj):
+#         request = self.context.get("request")
+#         if request and request.user.is_authenticated:
+#             return Wishlist.objects.filter(user=request.user, listing=obj).exists()
+#         return False
+
+#     def get_host_name(self, obj):
+#         return f"{obj.host.first_name} {obj.host.last_name}"
+
+#     def get_moderated_by_name(self, obj):
+#         if obj.moderated_by:
+#             return f"{obj.moderated_by.first_name} {obj.moderated_by.last_name}"
+#         return None
+
+
+#     def get_amenities(self, obj):
+#         """Return list of enabled amenities"""
+#         amenity_fields = [
+#             "wifi",
+#             "parking",
+#             "kitchen",
+#             "air_conditioning",
+#             "heating",
+#             "bath_tub",
+#             "personal_care",
+#             "outdoor_shower",
+#             "washer",
+#             "dryer",
+#             "hangers",
+#             "iron",
+#             "tv",
+#             "dedicated_workspace",
+#             "security_cameras",
+#             "fire_extinguisher",
+#             "first_aid",
+#             "cooking_set",
+#             "refrigerator",
+#             "microwave",
+#             "stove",
+#             "barbecue_grill",
+#             "outdoor_dining_area",
+#             "private_patio_or_balcony",
+#             "camp_fire",
+#             "garden",
+#             "free_parking",
+#             "self_check_in",
+#             "pet_allowed",
+#         ]
+#         return [field for field in amenity_fields if getattr(obj, field, False)]
 class ListingDetailSerializer(serializers.ModelSerializer):
     host_name = serializers.SerializerMethodField()
-    images = ListingImageSerializer(many=True, read_only=True)
-    moderated_by_name = serializers.SerializerMethodField()
-    amenities = serializers.SerializerMethodField()
+    host_phone = serializers.CharField(source="host.phone_number", read_only=True)
+    host_email = serializers.EmailField(source="host.email", read_only=True)
+    images = serializers.SerializerMethodField()
+    average_rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+    approved_reviews = serializers.SerializerMethodField()
     is_wishlisted = serializers.SerializerMethodField()
+    amenities = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -481,81 +506,75 @@ class ListingDetailSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
-            "highlight",
-            "highlight_details",
+            "category",
             "property_type",
-            "city",
+            "province",
             "district",
+            "region",
+            "city",
             "address",
             "latitude",
             "longitude",
+            "price_per_night",
             "bedrooms",
+            "beds",
             "bathrooms",
             "max_guests",
-            "price_per_night",
-            "cleaning_fee",
-            "wifi",
-            "parking",
-            "kitchen",
-            "air_conditioning",
-            "heating",
-            "bath_tub",
-            "personal_care",
-            "outdoor_shower",
-            "washer",
-            "dryer",
-            "hangers",
-            "iron",
-            "tv",
-            "dedicated_workspace",
-            "security_cameras",
-            "fire_extinguisher",
-            "first_aid",
-            "cooking_set",
-            "refrigerator",
-            "microwave",
-            "stove",
-            "barbecue_grill",
-            "outdoor_dining_area",
-            "private_patio_or_balcony",
-            "camp_fire",
-            "garden",
-            "free_parking",
-            "self_check_in",
-            "pet_allowed",
-            "category",
-            "beds",
-            "apt_suite",
-            "province",
-            "region",
-            "country",
+            "amenities",
+            "highlight",
             "status",
-            "host",
-            "host_name",
-            "images",
-            "moderated_by",
-            "moderated_by_name",
-            "moderation_reason",
-            "moderated_at",
             "created_at",
             "updated_at",
-            "amenities",
+            "host_name",
+            "host_phone",
+            "host_email",
+            "images",
+            "average_rating",
+            "total_reviews",
+            "approved_reviews",
             "is_wishlisted",
         ]
+
+    def get_host_name(self, obj):
+        full_name = f"{obj.host.first_name} {obj.host.last_name}".strip()
+        return full_name if full_name else obj.host.email
+
+    def get_images(self, obj):
+        request = self.context.get("request")
+        images = obj.images.all().order_by("-is_primary", "id")
+        image_urls = []
+
+        for image in images:
+            if request:
+                image_urls.append(request.build_absolute_uri(image.image.url))
+            else:
+                image_urls.append(image.image.url)
+
+        return image_urls
+
+    def get_average_rating(self, obj):
+        approved_reviews = obj.reviews.filter(is_approved=True)
+        if not approved_reviews.exists():
+            return 0
+        avg = approved_reviews.aggregate(avg=Avg("rating"))["avg"] or 0
+        return round(avg, 1)
+
+    def get_total_reviews(self, obj):
+        return obj.reviews.filter(is_approved=True).count()
+
+    def get_approved_reviews(self, obj):
+        reviews = (
+            obj.reviews.filter(is_approved=True)
+            .select_related("reviewer")
+            .order_by("-created_at")
+        )
+        return PublicReviewSerializer(reviews, many=True, context=self.context).data
 
     def get_is_wishlisted(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return Wishlist.objects.filter(user=request.user, listing=obj).exists()
         return False
-
-    def get_host_name(self, obj):
-        return f"{obj.host.first_name} {obj.host.last_name}"
-
-    def get_moderated_by_name(self, obj):
-        if obj.moderated_by:
-            return f"{obj.moderated_by.first_name} {obj.moderated_by.last_name}"
-        return None
 
     def get_amenities(self, obj):
         """Return list of enabled amenities"""
@@ -635,7 +654,7 @@ class BookingListSerializer(serializers.ModelSerializer):
 
 
 # admin panel mah review ko list dekhauna ko lagi
-class ReviewListSerializer(serializers.ModelSerializer):
+class AdminReviewListSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.SerializerMethodField()
     listing_title = serializers.SerializerMethodField()
     moderated_by_name = serializers.SerializerMethodField()
@@ -683,7 +702,7 @@ class AdminStatsSerializer(serializers.Serializer):
     pending_listings = serializers.IntegerField()
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
     recent_bookings = BookingListSerializer(many=True)
-    recent_reviews = ReviewListSerializer(many=True)
+    recent_reviews = AdminReviewListSerializer(many=True)
     monthly_bookings = serializers.JSONField()
     monthly_revenue = serializers.JSONField()
     listings_by_type = serializers.JSONField()
@@ -759,38 +778,91 @@ class WishlistSerializer(serializers.ModelSerializer):
         return ListingListSerializer(obj.listing, context=self.context).data
 
 
-class BookingCreateSerializer(serializers.ModelSerializer):
-    total_nights = serializers.ReadOnlyField()
+# class BookingCreateSerializer(serializers.ModelSerializer):
+#     total_nights = serializers.ReadOnlyField()
 
+#     class Meta:
+#         model = Booking
+#         fields = [
+#             "id",
+#             "listing",
+#             "check_in",
+#             "check_out",
+#             "guests_count",
+#             "special_requests",
+#             "total_amount",
+#             "cleaning_fee",
+#             "service_fee",
+#             "total_nights",
+#             "status",
+#             "payment_status",
+#             "payment_method",
+#             "created_at",
+#         ]
+
+#         read_only_fields = [
+#             "id",
+#             "total_amount",
+#             "cleaning_fee",
+#             "service_fee",
+#             "status",
+#             "payment_status",
+#             "payment_method",
+#             "created_at",
+#         ]
+
+#     def validate(self, attrs):
+#         check_in = attrs.get("check_in")
+#         check_out = attrs.get("check_out")
+#         guests_count = attrs.get("guests_count")
+#         listing = attrs.get("listing")
+
+#         # check in chai future mah huna parcha
+#         from django.utils.timezone import now
+
+#         if check_in < now().date():
+#             raise serializers.ValidationError(
+#                 {"check_in": "check-in date cannot be in the past."}
+#             )
+#         # check out must be after check in
+#         if check_out <= check_in:
+#             raise serializers.ValidationError(
+#                 {"check_out": "Check-out must be after check-in date."}
+#             )
+
+#         # guests must not exceed listing max
+#         if guests_count > listing.max_guests:
+#             raise serializers.ValidationError(
+#                 {"guests_count": f"Max guests allowed is {listing.max_guests}."}
+#             )
+#         # check if listing is available(no overlapping confirmed/paid bookings)
+#         overlapping = Booking.objects.filter(
+#             listing=listing,
+#             status__in=["pending", "confirmed", "paid"],
+#             check_in__lt=check_out,
+#             check_out__gt=check_in,
+#         ).exists()
+
+
+#         if overlapping:
+#             raise serializers.ValidationError(
+#                 {"check_in": "This listing is already booked for the selected dates."}
+#             )
+#         return attrs
+class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            "id",
             "listing",
             "check_in",
             "check_out",
             "guests_count",
             "special_requests",
-            "total_amount",
-            "cleaning_fee",
-            "service_fee",
-            "total_nights",
-            "status",
-            "payment_status",
-            "payment_method",
-            "created_at",
         ]
 
-        read_only_fields = [
-            "id",
-            "total_amount",
-            "cleaning_fee",
-            "service_fee",
-            "status",
-            "payment_status",
-            "payment_method",
-            "created_at",
-        ]
+        extra_kwargs = {
+            "special_requests": {"required": False},
+        }
 
     def validate(self, attrs):
         check_in = attrs.get("check_in")
@@ -798,25 +870,23 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         guests_count = attrs.get("guests_count")
         listing = attrs.get("listing")
 
-        # check in chai future mah huna parcha
         from django.utils.timezone import now
 
         if check_in < now().date():
             raise serializers.ValidationError(
                 {"check_in": "check-in date cannot be in the past."}
             )
-        # check out must be after check in
+
         if check_out <= check_in:
             raise serializers.ValidationError(
                 {"check_out": "Check-out must be after check-in date."}
             )
 
-        # guests must not exceed listing max
         if guests_count > listing.max_guests:
             raise serializers.ValidationError(
                 {"guests_count": f"Max guests allowed is {listing.max_guests}."}
             )
-        # check if listing is available(no overlapping confirmed/paid bookings)
+
         overlapping = Booking.objects.filter(
             listing=listing,
             status__in=["pending", "confirmed", "paid"],
@@ -828,66 +898,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"check_in": "This listing is already booked for the selected dates."}
             )
+
         return attrs
-
-
-# class BookingDetailSerializer(serializers.ModelSerializer):
-#     listing_title = serializers.CharField(source="listing.title", read_only=True)
-#     listing_image = serializers.SerializerMethodField()
-#     listing_city = serializers.CharField(source="listing.city", read_only=True)
-#     guest_name = serializers.SerializerMethodField()
-#     host_name = serializers.SerializerMethodField()
-#     host_id = serializers.IntegerField(source="listing.host.id", read_only=True)
-#     total_nights = serializers.ReadOnlyField()
-
-#     class Meta:
-#         model = Booking
-#         fields = [
-#             "id",
-#             "listing",
-#             "listing_title",
-#             "listing_image",
-#             "listing_city",
-#             "guest_name",
-#             "host_name",
-#             "host_id",
-#             "check_in",
-#             "check_out",
-#             "guests_count",
-#             "special_requests",
-#             "total_amount",
-#             "cleaning_fee",
-#             "service_fee",
-#             "total_nights",
-#             "status",
-#             "payment_status",
-#             "khalti_transaction_id",
-#             "paid_at",
-#             "host_responded_at",
-#             "host_rejection_reasons",
-#             "created_at",
-#             "updated_at",
-#         ]
-
-
-# def get_listing_image(self, obj):
-#     primary = obj.listing.images.filter(is_primary=True)
-#     if not primary:
-#         primary = obj.listing.images.first()
-#     if primary:
-#         request = self.context.get("request")
-#         if request:
-#             return request.build_absolute_uri(primary.image.url)
-#         return primary.image.url
-#     return None
-
-
-# def get_guest_name(self, obj):
-#     return f"{obj.guest.first_name} {obj.guest.last_name}"
-
-
-# def get_host__name(self, obj):
-#     return f"{obj.listing.host.first_name} {obj.listing.host.last_name}"
 
 
 class BookingDetailSerializer(serializers.ModelSerializer):
@@ -898,6 +910,9 @@ class BookingDetailSerializer(serializers.ModelSerializer):
     host_name = serializers.SerializerMethodField()
     host_id = serializers.IntegerField(source="listing.host.id", read_only=True)
     total_nights = serializers.ReadOnlyField()
+    can_review = serializers.SerializerMethodField()
+    has_review = serializers.SerializerMethodField()
+    review_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -929,6 +944,15 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "host_rejection_reasons",
             "created_at",
             "updated_at",
+            "can_review",
+            "has_review",
+            "review_id",
+            "room_subtotal",
+            "cleaning_fee",
+            "service_fee",
+            "total_amount",
+            "host_payout",
+            "superadmin_revenue",
         ]
 
     def get_listing_image(self, obj):
@@ -947,3 +971,99 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
     def get_host_name(self, obj):
         return f"{obj.listing.host.first_name} {obj.listing.host.last_name}"
+
+    def get_has_review(self, obj):
+        return hasattr(obj, "review")
+
+    def get_review_id(self, obj):
+
+        if hasattr(obj, "review"):
+            return obj.review.id
+        return None
+
+    def get_can_review(self, obj):
+        today = timezone.now().date()
+
+        if obj.check_out >= today:
+            return False
+
+        if hasattr(obj, "review"):
+            return False
+
+        if obj.status not in ["confirmed", "paid", "completed"]:
+            return False
+
+        return True
+
+
+class ReviewCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ["id", "booking", "rating", "comment"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        booking = attrs.get("booking")
+
+        if booking.guest != request.user:
+            raise serializers.ValidationError("You can only review your own booking.")
+
+        if booking.check_out >= timezone.now().date():
+            raise serializers.ValidationError("You can review only after checkout.")
+
+        if hasattr(booking, "review"):
+            raise serializers.ValidationError("You already reviewed this booking.")
+
+        if booking.status not in ["confirmed", "paid", "completed"]:
+            raise serializers.ValidationError(
+                "This booking is not eligible for review."
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        booking = validated_data["booking"]
+        request = self.context.get("request")
+
+        review = Review.objects.create(
+            booking=booking,
+            reviewer=request.user,
+            listing=booking.listing,
+            rating=validated_data["rating"],
+            comment=validated_data["comment"],
+        )
+        return review
+
+
+class PublicReviewSerializer(serializers.ModelSerializer):
+    reviewer_name = serializers.SerializerMethodField()
+    reviewer_avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Review
+        fields = [
+            "id",
+            "rating",
+            "comment",
+            "created_at",
+            "reviewer_name",
+            "reviewer_avatar",
+        ]
+
+    def get_reviewer_name(self, obj):
+        full_name = f"{obj.reviewer.first_name} {obj.reviewer.last_name}".strip()
+        return full_name if full_name else obj.reviewer.email
+
+    def get_reviewer_avatar(self, obj):
+        if hasattr(obj.reviewer, "profile_image") and obj.reviewer.profile_image:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.reviewer.profile_image.url)
+            return obj.reviewer.profile_image.url
+        return None
+
+
+class PlatformSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformSetting
+        fields = ["site_name", "service_fee_percent", "updated_at"]

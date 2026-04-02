@@ -110,10 +110,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+# TIME_ZONE = "UTC"
 
 USE_I18N = True
 
+# USE_TZ = True
+TIME_ZONE = "Asia/Kathmandu"
 USE_TZ = True
 
 
@@ -245,10 +247,19 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # print("EMAIL_HOST_USER raw =", os.getenv("EMAIL_HOST_USER"))
 # print("EMAIL_HOST_PASSWORD raw =", os.getenv("EMAIL_HOST_PASSWORD"))
 
-KHALTI_SECRET_KEY = "c831d41cc43f4be088dc047b9f358ae7"
-KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/"
-KHALTI_VERIFY_URL = "https://a.khalti.com/api/v2/epayment/lookup/"
-
+# KHALTI_SECRET_KEY = "c831d41cc43f4be088dc047b9f358ae7"
+# KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/"
+# KHALTI_VERIFY_URL = "https://a.khalti.com/api/v2/epayment/lookup/"
+KHALTI_SECRET_KEY = os.getenv("KHALTI_SECRET_KEY", "c831d41cc43f4be088dc047b9f358ae7")
+KHALTI_INITIATE_URL = os.getenv(
+    "KHALTI_INITIATE_URL",
+    "https://dev.khalti.com/api/v2/epayment/initiate/",
+)
+KHALTI_VERIFY_URL = os.getenv(
+    "KHALTI_VERIFY_URL",
+    "https://dev.khalti.com/api/v2/epayment/lookup/",
+)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 

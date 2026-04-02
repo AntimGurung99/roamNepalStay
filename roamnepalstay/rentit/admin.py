@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from .models import User, HostApplication, Listing, ListingImage, Booking, Review
 from .forms import CustomUserCreationForm, CustomUserChangeForm
+from .models import PlatformSetting
 
 
 # Customize User Admin (EMAIL LOGIN)
@@ -157,7 +158,7 @@ class BookingAdmin(admin.ModelAdmin):
         "get_guest_name",
         "check_in",
         "check_out",
-        "payment_status" ,
+        "payment_status",
         "total_amount",
         "status",
         "created_at",
@@ -189,3 +190,14 @@ class ReviewAdmin(admin.ModelAdmin):
 
 # Register our custom User admin
 admin.site.register(User, UserAdmin)
+
+
+@admin.register(PlatformSetting)
+class PlatformSettingAdmin(admin.ModelAdmin):
+    list_display = ("site_name", "service_fee_percent", "updated_at")
+
+    def has_add_permission(self, request):
+        return not PlatformSetting.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
