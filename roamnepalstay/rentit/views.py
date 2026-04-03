@@ -72,6 +72,7 @@ from .serializers import (
     AdminReviewListSerializer,
     PublicReviewSerializer,
     PlatformSettingSerializer,
+    ListingMapSerializer,
 )
 from .utils import generate_otp, send_otp_email, send_booking_confirmation_emails
 
@@ -675,9 +676,11 @@ class AdminBookingViewSet(GenericViewSet):
     queryset = Booking.objects.all()
 
     def list(self, request):
-        bookings = Booking.objects.select_related(
-            "guest", "listing", "listing__host"
-        ).exclude(status=Booking.Status.DRAFT).order_by("-created_at")
+        bookings = (
+            Booking.objects.select_related("guest", "listing", "listing__host")
+            .exclude(status=Booking.Status.DRAFT)
+            .order_by("-created_at")
+        )
         status_filter = request.query_params.get("status", "")
         if status_filter:
             bookings = bookings.filter(status=status_filter)
@@ -869,6 +872,106 @@ class ListingViewSet(GenericViewSet):
         listings = Listing.objects.filter(host=request.user).order_by("-created_at")
         serializer = ListingListSerializer(
             listings, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+
+# class ListingMapAPIView(APIView):
+#     permission_classes = [AllowAny]
+
+#     def get(self, request):
+#         listings = (
+#             Listing.objects.filter(status="published")
+#             .exclude(latitude__isnull=True)
+#             .exclude(longitude__isnull=True)
+#             .order_by("-created_at")
+#         )
+
+#         search = request.query_params.get("search", "").strip()
+#         min_price = request.query_params.get("min_price")
+#         max_price = request.query_params.get("max_price")
+#         city = request.query_params.get("city", "").strip()
+
+#         north = request.query_params.get("north")
+#         south = request.query_params.get("south")
+#         east = request.query_params.get("east")
+#         west = request.query_params.get("west")
+
+#         if search:
+#             listings = listings.filter(
+#                 Q(title__icontains=search)
+#                 | Q(city__icontains=search)
+#                 | Q(district__icontains=search)
+#                 | Q(region__icontains=search)
+#                 | Q(province__icontains=search)
+#                 | Q(address__icontains=search)
+#                 | Q(category__icontains=search)
+#                 | Q(property_type__icontains=search)
+#                 | Q(description__icontains=search)
+#             )
+
+#         if city:
+#             listings = listings.filter(city__icontains=city)
+
+#         if min_price:
+#             listings = listings.filter(price_per_night__gte=min_price)
+
+#         if max_price:
+#             listings = listings.filter(price_per_night__lte=max_price)
+
+#         if north and south and east and west:
+#             listings = listings.filter(
+#                 latitude__lte=float(north),
+#                 latitude__gte=float(south),
+#                 longitude__lte=float(east),
+#                 longitude__gte=float(west),
+#             )
+
+#         serializer = ListingMapSerializer(
+#             listings[:300], many=True, context={"request": request}
+#         )
+#         return Response(serializer.data)
+
+
+class ListingMapAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        listings = (
+            Listing.objects.filter(status="published")
+            .exclude(latitude__isnull=True)
+            .exclude(longitude__isnull=True)
+            .order_by("-created_at")
+        )
+
+        district = request.query_params.get("district", "").strip()
+        min_price = request.query_params.get("min_price")
+        max_price = request.query_params.get("max_price")
+
+        north = request.query_params.get("north")
+        south = request.query_params.get("south")
+        east = request.query_params.get("east")
+        west = request.query_params.get("west")
+
+        if district:
+            listings = listings.filter(district__icontains=district)
+
+        if min_price:
+            listings = listings.filter(price_per_night__gte=min_price)
+
+        if max_price:
+            listings = listings.filter(price_per_night__lte=max_price)
+
+        if north and south and east and west:
+            listings = listings.filter(
+                latitude__lte=float(north),
+                latitude__gte=float(south),
+                longitude__lte=float(east),
+                longitude__gte=float(west),
+            )
+
+        serializer = ListingMapSerializer(
+            listings[:300], many=True, context={"request": request}
         )
         return Response(serializer.data)
 
@@ -1074,7 +1177,6 @@ class BookingCreateView(APIView):
         )
 
 
-
 # class BookingListView(APIView):
 #     permission_classes = [IsAuthenticated]
 
@@ -1096,7 +1198,11 @@ class BookingListView(APIView):
             status__in=["confirmed", "paid"],
         ).update(status="completed")
 
-        bookings = Booking.objects.filter(guest=request.user).exclude(status=Booking.Status.DRAFT).order_by("-created_at")
+        bookings = (
+            Booking.objects.filter(guest=request.user)
+            .exclude(status=Booking.Status.DRAFT)
+            .order_by("-created_at")
+        )
         serializer = BookingDetailSerializer(
             bookings, many=True, context={"request": request}
         )
@@ -1156,8 +1262,10 @@ class HostBookingViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        bookings = Booking.objects.filter(listing__host=request.user).exclude(status=Booking.Status.DRAFT).order_by(
-            "-created_at"
+        bookings = (
+            Booking.objects.filter(listing__host=request.user)
+            .exclude(status=Booking.Status.DRAFT)
+            .order_by("-created_at")
         )
         status_filter = request.query_params.get("status", "")
         if status_filter:
@@ -1198,8 +1306,6 @@ class CashInHandBookingView(APIView):
         booking.save()
 
         send_booking_confirmation_emails(booking)
-
-
 
         return Response(
             {

@@ -35,6 +35,7 @@ from .views import (
     PlatformSettingAPIView,
     HostAnalyticsView,
     PublicPlatformFeeAPIView,
+    ListingMapAPIView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -127,4 +128,6 @@ urlpatterns = [
         PublicPlatformFeeAPIView.as_view(),
         name="public-platform-fee",
     ),
+    # Map
+    path("listings/map/", ListingMapAPIView.as_view(), name="listings-map"),
 ]

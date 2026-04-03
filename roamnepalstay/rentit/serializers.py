@@ -8,6 +8,7 @@ from .models import Listing, ListingImage, HostApplication, Booking, Review, Wis
 from django.utils import timezone
 from django.db.models import Avg
 from .models import PlatformSetting, Booking
+from .geocoding import geocode_listing_address
 
 User = get_user_model()
 
@@ -709,7 +710,72 @@ class AdminStatsSerializer(serializers.Serializer):
     host_application_status = serializers.JSONField()
 
 
+# class ListingCreateSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Listing
+#         fields = [
+#             "title",
+#             "description",
+#             "highlight",
+#             "highlight_details",
+#             "property_type",
+#             "city",
+#             "district",
+#             "address",
+#             "bedrooms",
+#             "bathrooms",
+#             "max_guests",
+#             "price_per_night",
+#             "cleaning_fee",
+#             "wifi",
+#             "parking",
+#             "kitchen",
+#             "air_conditioning",
+#             "heating",
+#             "bath_tub",
+#             "personal_care",
+#             "outdoor_shower",
+#             "washer",
+#             "dryer",
+#             "hangers",
+#             "iron",
+#             "tv",
+#             "dedicated_workspace",
+#             "security_cameras",
+#             "fire_extinguisher",
+#             "first_aid",
+#             "cooking_set",
+#             "refrigerator",
+#             "microwave",
+#             "stove",
+#             "barbecue_grill",
+#             "outdoor_dining_area",
+#             "private_patio_or_balcony",
+#             "camp_fire",
+#             "garden",
+#             "free_parking",
+#             "self_check_in",
+#             "pet_allowed",
+#             "category",
+#             "beds",
+#             "apt_suite",
+#             "province",
+#             "region",
+#             "country",
+#         ]
+
+#     def create(self, validated_data):
+#         return Listing.objects.create(**validated_data)
+
+
 class ListingCreateSerializer(serializers.ModelSerializer):
+    latitude = serializers.DecimalField(
+        max_digits=10, decimal_places=8, required=False, allow_null=True
+    )
+    longitude = serializers.DecimalField(
+        max_digits=11, decimal_places=8, required=False, allow_null=True
+    )
+
     class Meta:
         model = Listing
         fields = [
@@ -761,10 +827,66 @@ class ListingCreateSerializer(serializers.ModelSerializer):
             "province",
             "region",
             "country",
+            "latitude",
+            "longitude",
         ]
 
+    def _resolve_coordinates(self, validated_data, instance=None):
+        lat = validated_data.get(
+            "latitude", getattr(instance, "latitude", None) if instance else None
+        )
+        lon = validated_data.get(
+            "longitude", getattr(instance, "longitude", None) if instance else None
+        )
+
+        if lat is not None and lon is not None:
+            return lat, lon
+
+        address = validated_data.get(
+            "address", getattr(instance, "address", "") if instance else ""
+        )
+        city = validated_data.get(
+            "city", getattr(instance, "city", "") if instance else ""
+        )
+        province = validated_data.get(
+            "province", getattr(instance, "province", "") if instance else ""
+        )
+        region = validated_data.get(
+            "region", getattr(instance, "region", "") if instance else ""
+        )
+        district = validated_data.get(
+            "district", getattr(instance, "district", "") if instance else ""
+        )
+        country = validated_data.get(
+            "country", getattr(instance, "country", "Nepal") if instance else "Nepal"
+        )
+
+        geo_lat, geo_lon = geocode_listing_address(
+            address=address,
+            city=city,
+            province=province,
+            region=region,
+            district=district,
+            country=country,
+        )
+        return geo_lat, geo_lon
+
     def create(self, validated_data):
+        lat, lon = self._resolve_coordinates(validated_data)
+        validated_data["latitude"] = lat
+        validated_data["longitude"] = lon
         return Listing.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        lat, lon = self._resolve_coordinates(validated_data, instance=instance)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.latitude = lat
+        instance.longitude = lon
+        instance.save()
+        return instance
 
 
 class WishlistSerializer(serializers.ModelSerializer):
@@ -1067,3 +1189,37 @@ class PlatformSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformSetting
         fields = ["site_name", "service_fee_percent", "updated_at"]
+
+
+class ListingMapSerializer(serializers.ModelSerializer):
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Listing
+        fields = [
+            "id",
+            "title",
+            "city",
+            "district",
+            "region",
+            "province",
+            "address",
+            "price_per_night",
+            "latitude",
+            "longitude",
+            "primary_image",
+            "category",
+            "property_type",
+        ]
+
+    def get_primary_image(self, obj):
+        request = self.context.get("request")
+        primary_image = obj.images.filter(is_primary=True).first()
+        if not primary_image:
+            primary_image = obj.images.first()
+
+        if primary_image:
+            if request:
+                return request.build_absolute_uri(primary_image.image.url)
+            return primary_image.image.url
+        return None
