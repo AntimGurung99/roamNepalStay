@@ -8,7 +8,10 @@ const ReviewsManagement = () => {
     const [approvedFilter, setApprovedFilter] = useState('all');
 
     useEffect(() => {
-        fetchReviews();
+        const timeoutId = setTimeout(() => {
+            fetchReviews();
+        }, 500);
+        return () => clearTimeout(timeoutId);
     }, [approvedFilter]);
 
     const fetchReviews = async () => {

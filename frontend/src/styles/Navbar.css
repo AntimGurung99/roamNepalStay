@@ -286,3 +286,18 @@
   padding: 3px 7px;
   border-radius: 50%;
 }
+
+.nav__exploreMap {
+  margin-right: 14px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  text-decoration: none;
+  color: #111;
+  font-weight: 600;
+  border: 1px solid #ddd;
+  transition: 0.2s ease;
+}
+
+.nav__exploreMap:hover {
+  background: #f7f7f7;
+}

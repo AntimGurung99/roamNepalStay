@@ -1,110 +1,164 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import api from "../api/axios";
-import '../styles/PaymentSuccess.css';
-const PaymentSuccess = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+import { useEffect, useState } from "react";
+import { CheckCircle, Loader2 } from "lucide-react";
+import {
+  useNavigate,
+  useSearchParams,
+  useParams,
+  useLocation,
+} from "react-router-dom";
+import { paymentsAPI } from "../api/axios";
+import "../styles/PaymentSuccess.css";
 
-  const [status, setStatus] = useState("verifying");
-  const [booking, setBooking] = useState(null);
+const PaymentSuccess = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { bookingId } = useParams();
+  const location = useLocation();
+
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("Verifying your payment...");
   const [error, setError] = useState("");
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const pidx = searchParams.get("pidx");
-      const bookingId = localStorage.getItem("pending_booking_id");
-
-      console.log("pidx:", pidx);
-      console.log("bookingId:", bookingId);
-
-      if (!pidx || !bookingId) {
-        setStatus("error");
-        setError("Missing payment details.");
-        return;
-      }
-
       try {
-        const res = await api.post("/bookings/verify-payment/", {
-          pidx,
-          booking_id: parseInt(bookingId),
-        });
-
-        setBooking(res.data.booking);
-        setStatus("success");
-
-        localStorage.removeItem("pending_booking_id");
-        localStorage.removeItem("pending_booking_pidx");
-      } catch (err) {
-        console.error(err);
-        setStatus("error");
-        setError(
-          err?.response?.data?.error || "Payment verification failed."
+        const isEsewaRoute = location.pathname.includes(
+          "/booking/payment-success/esewa/"
         );
+
+        const provider = isEsewaRoute
+          ? "esewa"
+          : searchParams.get("provider");
+
+        if (provider === "khalti") {
+          const pidx = searchParams.get("pidx");
+          const purchaseOrderId =
+            searchParams.get("purchase_order_id") ||
+            searchParams.get("booking_id");
+          const statusParam = searchParams.get("status");
+
+          if (!pidx || !purchaseOrderId) {
+            throw new Error("Missing Khalti payment information.");
+          }
+
+          if (statusParam && statusParam !== "Completed") {
+            throw new Error(`Khalti returned status: ${statusParam}`);
+          }
+
+          await paymentsAPI.verifyKhaltiPayment({
+            pidx,
+            booking_id: purchaseOrderId,
+          });
+
+          setMessage("Khalti payment verified successfully.");
+        } else if (provider === "esewa") {
+          const esewaBookingId =
+            bookingId || searchParams.get("booking_id");
+
+          if (!esewaBookingId) {
+            throw new Error("Missing eSewa booking ID.");
+          }
+
+          await paymentsAPI.verifyEsewaPayment({
+            booking_id: esewaBookingId,
+          });
+
+          setMessage("eSewa payment verified successfully.");
+        } else {
+          throw new Error("Unknown payment provider.");
+        }
+      } catch (err) {
+        console.error("Payment verification error:", err);
+
+        const data = err?.response?.data;
+
+        if (typeof data?.detail === "string") {
+          setError(data.detail);
+        } else if (data && typeof data === "object") {
+          const firstError = Object.values(data)[0];
+
+          if (Array.isArray(firstError)) {
+            setError(firstError[0]);
+          } else if (typeof firstError === "string") {
+            setError(firstError);
+          } else {
+            setError("Payment verification failed.");
+          }
+        } else if (err?.message) {
+          setError(err.message);
+        } else {
+          setError("Payment verification failed.");
+        }
+      } finally {
+        setLoading(false);
       }
     };
 
     verifyPayment();
-  }, [searchParams]);
+  }, [searchParams, bookingId, location.pathname]);
 
   return (
-    <div className="container">
-      <div className="card">
-
-        {status === "verifying" && (
+    <div className="payment-success-page">
+      <div className="payment-success-card">
+        {loading ? (
           <>
-            <div className="icon"></div>
-            <h2>Verifying Payment...</h2>
-            <p className="sub-text">
-              Please wait while we confirm your payment.
-            </p>
+            <Loader2 className="payment-spinner" size={60} />
+            <h1 className="payment-title">Verifying Payment</h1>
+            <p className="payment-message">{message}</p>
           </>
-        )}
-
-        {status === "success" && booking && (
+        ) : error ? (
           <>
-            <div className="success-icon"></div>
-            <h2 className="success-text">Payment Successful!</h2>
-            <p className="sub-text">
-              Your booking is confirmed. The host has been notified.
-            </p>
+            <div className="payment-error-icon">!</div>
+            <h1 className="payment-title payment-title-error">
+              Payment Verification Failed
+            </h1>
+            <p className="payment-message">{error}</p>
 
-            <div className="details-box">
-              {[
-                ["Booking ID", `#${booking?.id}`],
-                ["Property", booking?.listing_title],
-                ["Check-in", booking?.check_in],
-                ["Check-out", booking?.check_out],
-                [
-                  "Total Paid",
-                  `Rs. ${Number(booking?.total_amount || 0).toFixed(2)}`,
-                ],
-                ["Status", "Confirmed & Paid"],
-              ].map(([label, value]) => (
-                <div key={label} className="detail-row">
-                  <span className="label">{label}</span>
-                  <span className="value">{value}</span>
-                </div>
-              ))}
+            <div className="payment-button-group">
+              <button
+                type="button"
+                onClick={() => navigate("/my-bookings")}
+                className="payment-btn payment-btn-primary"
+              >
+                Go to My Bookings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="payment-btn payment-btn-secondary"
+              >
+                Go to Home
+              </button>
             </div>
-
-            <button className="button" onClick={() => navigate("/home")}>
-              Back to Home
-            </button>
           </>
-        )}
-
-        {status === "error" && (
+        ) : (
           <>
-            <div className="icon">❌</div>
-            <h2 className="error-text">Payment Failed</h2>
-            <p className="sub-text">{error}</p>
-            <button className="button" onClick={() => navigate("/home")}>
-              Back to Home
-            </button>
+            <CheckCircle className="payment-success-icon" size={64} />
+            <h1 className="payment-title payment-title-success">
+              Payment Successful
+            </h1>
+            <p className="payment-message">{message}</p>
+
+            <div className="payment-button-group">
+              <button
+                type="button"
+                onClick={() => navigate("/my-bookings")}
+                className="payment-btn payment-btn-primary"
+              >
+                Go to My Bookings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="payment-btn payment-btn-secondary"
+              >
+                Go to Home
+              </button>
+            </div>
           </>
         )}
-
       </div>
     </div>
   );

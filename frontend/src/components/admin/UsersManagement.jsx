@@ -17,18 +17,29 @@ const UsersManagement = () => {
     }, []);
 
     useEffect(() => {
-        fetchUsers();
+        const timeoutId = setTimeout(() => {
+            fetchUsers();
+        }, 500);
+        return () => clearTimeout(timeoutId);
     }, [searchTerm, filterType]);
+
+    const isSuperAdminUser = (user) => {
+        return (
+            user?.is_superuser === true ||
+            user?.email === 'naruto@gmail.com' ||
+            user?.username === 'naruto'
+        );
+    };
 
     const fetchUsers = async () => {
         try {
             const token = localStorage.getItem('access');
             let url = 'http://127.0.0.1:8000/api/admin/users/';
-            
+
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
             if (filterType !== 'all') params.append('type', filterType);
-            
+
             if (params.toString()) {
                 url += '?' + params.toString();
             }
@@ -39,7 +50,7 @@ const UsersManagement = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 setUsers(data.results || data);
@@ -61,9 +72,9 @@ const UsersManagement = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
-                fetchUsers(); // Refresh the list
+                fetchUsers();
                 alert('User status updated successfully!');
             }
         } catch (error) {
@@ -82,9 +93,9 @@ const UsersManagement = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
-                fetchUsers(); // Refresh the list
+                fetchUsers();
                 alert('User made staff successfully!');
             }
         } catch (error) {
@@ -102,7 +113,7 @@ const UsersManagement = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
                 const userData = await response.json();
                 setSelectedUser(userData);
@@ -113,7 +124,6 @@ const UsersManagement = () => {
         }
     };
 
-    // Remove staff privileges from a user
     const handleRemoveStaff = async (userId) => {
         try {
             const token = localStorage.getItem('access');
@@ -124,15 +134,25 @@ const UsersManagement = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
-                fetchUsers(); // Refresh the list
+                fetchUsers();
                 alert('User staff status removed successfully!');
             }
         } catch (error) {
             console.error('Error removing staff status:', error);
             alert('Error removing staff status');
         }
+    };
+
+    const getUserTypeLabel = (user) => {
+        if (isSuperAdminUser(user)) return 'SUPERADMIN';
+        return user.is_host ? 'HOST' : 'GUEST';
+    };
+
+    const getUserTypeBadgeClass = (user) => {
+        if (isSuperAdminUser(user)) return 'superadmin-badge';
+        return user.is_host ? 'host-badge' : 'guest-badge';
     };
 
     if (loading) {
@@ -151,7 +171,6 @@ const UsersManagement = () => {
                 <p>Manage all registered users and their permissions</p>
             </div>
 
-            {/* Search and Filter Controls */}
             <div className="controls-section">
                 <div className="search-box">
                     <input
@@ -162,10 +181,10 @@ const UsersManagement = () => {
                         className="search-input"
                     />
                 </div>
-                
+
                 <div className="filter-controls">
-                    <select 
-                        value={filterType} 
+                    <select
+                        value={filterType}
                         onChange={(e) => setFilterType(e.target.value)}
                         className="filter-select"
                     >
@@ -176,7 +195,6 @@ const UsersManagement = () => {
                 </div>
             </div>
 
-            {/* Users Table */}
             <div className="table-container">
                 <table className="admin-table">
                     <thead>
@@ -192,171 +210,249 @@ const UsersManagement = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map(user => (
-                            <tr key={user.id}>
-                                <td>
-                                    <div className="user-info" style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        {user.profile_image ? (
-                                            <img 
-                                                src={`http://127.0.0.1:8000${user.profile_image}`} 
-                                                alt={user.full_name} 
-                                                className="admin-avatar" 
-                                            />
-                                        ) : (
-                                            <div className="no-avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#999', marginRight: '8px' }}>
-                                                {user.full_name?.charAt(0)}
+                        {users.map(user => {
+                            const isSuperAdmin = isSuperAdminUser(user);
+
+                            return (
+                                <tr key={user.id}>
+                                    <td>
+                                        <div
+                                            className="user-info"
+                                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                                        >
+                                            {user.profile_image ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000${user.profile_image}`}
+                                                    alt={user.full_name}
+                                                    className="admin-avatar"
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="no-avatar"
+                                                    style={{
+                                                        width: '36px',
+                                                        height: '36px',
+                                                        borderRadius: '50%',
+                                                        background: '#eee',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '12px',
+                                                        color: '#999',
+                                                        marginRight: '8px'
+                                                    }}
+                                                >
+                                                    {user.full_name?.charAt(0)}
+                                                </div>
+                                            )}
+
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <strong>{user.full_name}</strong>
+
+                                                {isSuperAdmin ? (
+                                                    <span className="badge superadmin-badge">SUPERADMIN</span>
+                                                ) : user.is_staff ? (
+                                                    <span className="badge staff-badge">STAFF</span>
+                                                ) : null}
                                             </div>
-                                        )}
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <strong>{user.full_name}</strong>
-                                            {user.is_staff && (
-                                                <span className="badge staff-badge">Staff</span>
+                                        </div>
+                                    </td>
+
+                                    <td>{user.email}</td>
+
+                                    <td>
+                                        <span className={`badge ${getUserTypeBadgeClass(user)}`}>
+                                            {getUserTypeLabel(user)}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span className={`status-badge ${user.is_active ? 'active' : 'inactive'}`}>
+                                            {user.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </td>
+
+                                    <td>{user.total_listings}</td>
+                                    <td>{user.total_bookings}</td>
+                                    <td>{new Date(user.created_at).toLocaleDateString()}</td>
+
+                                    <td>
+                                        <div className="action-buttons">
+                                            <button
+                                                onClick={() => handleViewUser(user.id)}
+                                                className="btn btn-info"
+                                                title="View Details"
+                                            >
+                                                VIEW
+                                            </button>
+
+                                            {!isSuperAdmin && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleToggleActive(user.id)}
+                                                        className={`btn ${user.is_active ? 'btn-warning' : 'btn-success'}`}
+                                                        title={user.is_active ? 'Deactivate' : 'Activate'}
+                                                    >
+                                                        {user.is_active ? 'OFF' : 'ON'}
+                                                    </button>
+
+                                                    {currentUser?.is_superuser && (
+                                                        user.is_staff ? (
+                                                            <button
+                                                                onClick={() => handleRemoveStaff(user.id)}
+                                                                className="btn btn-danger"
+                                                                title="Remove Staff"
+                                                            >
+                                                                UNSTAFF
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleMakeStaff(user.id)}
+                                                                className="btn btn-primary"
+                                                                title="Make Staff"
+                                                            >
+                                                                STAFF
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </>
                                             )}
                                         </div>
-                                    </div>
-                                </td>
-                                <td>{user.email}</td>
-                                <td>
-                                    <span className={`badge ${user.is_host ? 'host-badge' : 'guest-badge'}`}>
-                                        {user.is_host ? 'Host' : 'Guest'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className={`status-badge ${user.is_active ? 'active' : 'inactive'}`}>
-                                        {user.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
-                                <td>{user.total_listings}</td>
-                                <td>{user.total_bookings}</td>
-                                <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                                <td>
-                                    <div className="action-buttons">
-                                        <button 
-                                            onClick={() => handleViewUser(user.id)}
-                                            className="btn btn-info"
-                                            title="View Details"
-                                        >
-                                            VIEW
-                                        </button>
-                                        <button 
-                                            onClick={() => handleToggleActive(user.id)}
-                                            className={`btn ${user.is_active ? 'btn-warning' : 'btn-success'}`}
-                                            title={user.is_active ? 'Deactivate' : 'Activate'}
-                                        >
-                                            {user.is_active ? 'OFF' : 'ON'}
-                                        </button>
-                                        {currentUser?.is_superuser && (
-                                            user.is_staff ? (
-                                                <button 
-                                                    onClick={() => handleRemoveStaff(user.id)}
-                                                    className="btn btn-danger"
-                                                    title="Remove Staff"
-                                                >
-                                                    UNSTAFF
-                                                </button>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => handleMakeStaff(user.id)}
-                                                    className="btn btn-primary"
-                                                    title="Make Staff"
-                                                >
-                                                    STAFF
-                                                </button>
-                                            )
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
 
-            {/* User Detail Modal */}
             {showUserDetail && selectedUser && (
-                <div className="modal-overlay" onClick={() => setShowUserDetail(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>User Details</h3>
-                            <button 
+                <div className="user-details-overlay" onClick={() => setShowUserDetail(false)}>
+                    <div className="user-details-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="user-details-header">
+                            <div>
+                                <h2>User Details</h2>
+                                <p>View complete user profile information</p>
+                            </div>
+
+                            <button
                                 onClick={() => setShowUserDetail(false)}
-                                className="close-btn"
+                                className="user-details-close"
                             >
-                                    X
+                                ×
                             </button>
                         </div>
-                        
-                        <div className="modal-body">
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+
+                        <div className="user-details-body">
+                            <div className="user-profile-top">
                                 {selectedUser.profile_image ? (
-                                    <img 
-                                        src={`http://127.0.0.1:8000${selectedUser.profile_image}`} 
-                                        alt={selectedUser.full_name} 
-                                        style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #f0f0f0' }} 
+                                    <img
+                                        src={`http://127.0.0.1:8000${selectedUser.profile_image}`}
+                                        alt={selectedUser.full_name}
+                                        className="user-details-avatar"
                                     />
                                 ) : (
-                                    <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', color: '#999' }}>
-                                        {selectedUser.full_name?.charAt(0)}
+                                    <div className="user-details-avatar placeholder-avatar">
+                                        {selectedUser.full_name?.charAt(0) || 'U'}
                                     </div>
                                 )}
+
+                                <div className="user-profile-meta">
+                                    <h3>{selectedUser.full_name}</h3>
+                                    <p>{selectedUser.email}</p>
+                                </div>
                             </div>
-                            <div className="user-detail-grid">
-                                <div className="detail-item">
-                                    <label>Full Name:</label>
-                                    <span>{selectedUser.full_name}</span>
+
+                            <div className="user-section-card">
+                                <h3>Basic Information</h3>
+                                <div className="user-details-grid-clean">
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Full Name</span>
+                                        <span className="user-detail-value-clean">{selectedUser.full_name || 'N/A'}</span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Email</span>
+                                        <span className="user-detail-value-clean">{selectedUser.email || 'N/A'}</span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Username</span>
+                                        <span className="user-detail-value-clean">{selectedUser.username || 'N/A'}</span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Phone</span>
+                                        <span className="user-detail-value-clean">{selectedUser.phone_number || 'Not provided'}</span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean full-width">
+                                        <span className="user-detail-label-clean">Address</span>
+                                        <span className="user-detail-value-clean">{selectedUser.address || 'Not provided'}</span>
+                                    </div>
                                 </div>
-                                <div className="detail-item">
-                                    <label>Email:</label>
-                                    <span>{selectedUser.email}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Username:</label>
-                                    <span>{selectedUser.username}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Phone:</label>
-                                    <span>{selectedUser.phone_number || 'Not provided'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Address:</label>
-                                    <span>{selectedUser.address || 'Not provided'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>User Type:</label>
-                                    <span className={`badge ${selectedUser.is_host ? 'host-badge' : 'guest-badge'}`}>
-                                        {selectedUser.is_host ? 'Host' : 'Guest'}
-                                    </span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Host Application Status:</label>
-                                    <span className="badge">
-                                        {selectedUser.host_application_status}
-                                    </span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Account Status:</label>
-                                    <span className={`status-badge ${selectedUser.is_active ? 'active' : 'inactive'}`}>
-                                        {selectedUser.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Staff Status:</label>
-                                    <span className={`badge ${selectedUser.is_staff ? 'staff-badge' : 'guest-badge'}`}>
-                                        {selectedUser.is_staff ? 'Staff' : 'Regular User'}
-                                    </span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Joined Date:</label>
-                                    <span>{new Date(selectedUser.created_at).toLocaleDateString()}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <label>Last Login:</label>
-                                    <span>
-                                        {selectedUser.last_login_at 
-                                            ? new Date(selectedUser.last_login_at).toLocaleDateString()
-                                            : 'Never logged in'
-                                        }
-                                    </span>
+                            </div>
+
+                            <div className="user-section-card">
+                                <h3>Account Information</h3>
+                                <div className="user-details-grid-clean">
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">User Type</span>
+                                        <span className={`badge ${getUserTypeBadgeClass(selectedUser)}`}>
+                                            {getUserTypeLabel(selectedUser)}
+                                        </span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Host Application Status</span>
+                                        <span className="badge">
+                                            {selectedUser.host_application_status || 'NONE'}
+                                        </span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Account Status</span>
+                                        <span className={`status-badge ${selectedUser.is_active ? 'active' : 'inactive'}`}>
+                                            {selectedUser.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Staff Status</span>
+                                        <span
+                                            className={`badge ${
+                                                isSuperAdminUser(selectedUser)
+                                                    ? 'superadmin-badge'
+                                                    : selectedUser.is_staff
+                                                    ? 'staff-badge'
+                                                    : 'guest-badge'
+                                            }`}
+                                        >
+                                            {isSuperAdminUser(selectedUser)
+                                                ? 'Superadmin'
+                                                : selectedUser.is_staff
+                                                ? 'Staff'
+                                                : 'Regular User'}
+                                        </span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Joined Date</span>
+                                        <span className="user-detail-value-clean">
+                                            {selectedUser.created_at
+                                                ? new Date(selectedUser.created_at).toLocaleDateString()
+                                                : 'N/A'}
+                                        </span>
+                                    </div>
+
+                                    <div className="user-detail-card-clean">
+                                        <span className="user-detail-label-clean">Last Login</span>
+                                        <span className="user-detail-value-clean">
+                                            {selectedUser.last_login_at
+                                                ? new Date(selectedUser.last_login_at).toLocaleDateString()
+                                                : 'Never logged in'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -364,7 +460,6 @@ const UsersManagement = () => {
                 </div>
             )}
 
-            {/* Empty State */}
             {users.length === 0 && !loading && (
                 <div className="empty-state">
                     <p>No users found matching your criteria.</p>

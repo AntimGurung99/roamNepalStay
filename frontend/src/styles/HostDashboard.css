@@ -1,13 +1,191 @@
 .host-dashboard {
-  padding: 40px;
-  background: #f9fafb;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 50px;
+  background: #f8fafc;
   min-height: 100vh;
 }
 
-.dashboard-title {
-  font-size: 28px;
-  font-weight: 700;
+.dashboard-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.profile-back-btn {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #374151;
+  transition: 0.2s ease;
+}
+
+.profile-back-btn:hover {
+  background: #111827;
+  color: white;
+}
+
+.dashboard-message,
+.dashboard-error,
+.empty-text {
+  margin: 18px 0;
+  font-weight: 600;
+}
+
+.dashboard-error {
+  color: #b91c1c;
+}
+
+.host-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 18px;
+  padding: 22px;
+  border: 1px solid #edf0f3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.summary-card h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.summary-card p {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.summary-card-wide {
+  grid-column: span 2;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 28px;
+  border: 1px solid #edf0f3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.chart-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.chart-header span {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.custom-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 18px;
+  min-height: 300px;
+  padding-top: 10px;
+}
+
+.bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bar-value {
+  margin-bottom: 10px;
+  font-weight: 800;
+  color: #111827;
+  font-size: 16px;
+}
+
+.bar-track {
+  width: 70px;
+  height: 220px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #111827 0%, #4b5563 100%);
+  border-radius: 14px 14px 0 0;
+  transition: height 0.3s ease;
+}
+
+.bar-label {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  text-align: center;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  border: none;
+  background: #ececec;
+  color: #111827;
+  padding: 16px 26px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.tab-btn.active {
+  background: #111827;
+  color: white;
 }
 
 .booking-list {
@@ -17,78 +195,136 @@
 
 .booking-card {
   background: white;
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s;
-}
-
-.booking-card:hover {
-  transform: translateY(-3px);
+  border-radius: 18px;
+  padding: 22px;
+  border: 1px solid #edf0f3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
 }
 
 .booking-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
 
-.status {
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
+.booking-header h3 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #111827;
 }
 
-.status.paid {
-  background: #dcfce7;
-  color: #166534;
+.booking-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
 }
 
-.status.unpaid {
+.booking-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-pending {
   background: #fef3c7;
   color: #92400e;
 }
 
-.booking-body p {
-  margin: 4px 0;
-  font-size: 14px;
+.status-confirmed,
+.status-paid,
+.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.payment-paid {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.payment-unpaid,
+.payment-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.booking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.booking-item {
+  background: #f9fafb;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.booking-item .label {
+  display: block;
+  margin-bottom: 6px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.booking-item .value {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+  word-break: break-word;
+  text-transform: capitalize;
 }
 
 .booking-footer {
-  margin-top: 12px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #666;
-}
-
-.error {
-  color: red;
-}
-
-/* Back to Home button */
-.profile-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #555;
-  font-size: 14px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0f3;
+  color: #6b7280;
+  font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 24px;
 }
 
-.profile-back-btn:hover {
-  background: #fff0f3;
-  color: #ff385c;
-  border-color: #ff385c;
-  box-shadow: 0 2px 8px rgba(255, 56, 92, 0.1);
+@media (max-width: 768px) {
+  .host-dashboard {
+    padding: 24px 14px 40px;
+  }
+
+  .dashboard-title {
+    font-size: 26px;
+  }
+
+  .summary-card-wide {
+    grid-column: span 1;
+  }
+
+  .custom-bar-chart {
+    gap: 10px;
+  }
+
+  .bar-track {
+    width: 55px;
+  }
+
+  .tab-btn {
+    width: 100%;
+    text-align: center;
+  }
 }

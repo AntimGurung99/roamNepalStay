@@ -9,7 +9,10 @@ const BookingsManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        fetchBookings();
+        const timeoutId = setTimeout(() => {
+            fetchBookings();
+        }, 500);
+        return () => clearTimeout(timeoutId);
     }, [statusFilter, searchTerm]);
 
     const fetchBookings = async () => {

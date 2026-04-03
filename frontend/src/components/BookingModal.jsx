@@ -1,284 +1,397 @@
-import React, { useState } from "react";
-import api from "../api/axios";
+import { useEffect, useMemo, useState } from "react";
+import { X, ChevronDown, Plus, Minus } from "lucide-react";
+import { listingsAPI } from "../api/axios";
+import { useNavigate } from "react-router-dom";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import "../styles/BookingModal.css";
 
-const BookingModal = ({ isOpen, onClose, listing }) => {
-  const [step, setStep] = useState(1);
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [guestsCount, setGuestsCount] = useState(1);
+const BookingModal = ({ listing, isOpen, onClose }) => {
+  const navigate = useNavigate();
+
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [bookedDates, setBookedDates] = useState([]);
+  const [guests, setGuests] = useState({
+    adults: 1,
+    children: 0,
+    infants: 0,
+    pets: 0,
+  });
+  const [showGuestPicker, setShowGuestPicker] = useState(false);
   const [specialRequests, setSpecialRequests] = useState("");
-  const [booking, setBooking] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [paymentLoading, setPaymentLoading] = useState(false);
 
-  if (!isOpen || !listing) return null;
+  const maxGuests = Number(listing?.max_guests) || 10;
+  const totalGuests = guests.adults + guests.children;
 
-  const calculateNights = () => {
-    if (!checkIn || !checkOut) return 0;
-    const diff = new Date(checkOut) - new Date(checkIn);
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
-  const nights = calculateNights();
-  const pricePerNight = parseFloat(listing.price_per_night || 0);
-  const cleaningFee = parseFloat(listing.cleaning_fee || 0);
-  const serviceFee = Math.round(pricePerNight * nights * 0.05 * 100) / 100;
-  const total = pricePerNight * nights + cleaningFee + serviceFee;
-  const today = new Date().toISOString().split("T")[0];
+  const nights = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    const diffTime = endDate.getTime() - startDate.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [startDate, endDate]);
 
-  const handleNext = () => {
-    setError("");
-    if (!checkIn || !checkOut) {
-      setError("Please select check-in and check-out dates.");
-      return;
+  useEffect(() => {
+    if (isOpen && listing?.id) {
+      fetchBookedDates();
     }
-    if (nights <= 0) {
-      setError("Check-out must be after check-in.");
-      return;
-    }
-    if (guestsCount < 1 || guestsCount > listing.max_guests) {
-      setError(`Guests must be between 1 and ${listing.max_guests}.`);
-      return;
-    }
-    setStep(2);
-  };
+  }, [isOpen, listing?.id]);
 
-  // Step 1: Create booking then initiate Khalti payment
-  const handlePayNow = async () => {
-    setPaymentLoading(true);
-    setError("");
-
+  const fetchBookedDates = async () => {
     try {
-      // Step 1 — Create booking
-      const bookingRes = await api.post("/bookings/", {
-        listing: listing.id,
-        check_in: checkIn,
-        check_out: checkOut,
-        guests_count: guestsCount,
-        special_requests: specialRequests,
-      });
+      const response = await listingsAPI.getBookedDates(listing.id);
 
-      const newBooking = bookingRes.data;
-      setBooking(newBooking);
+      const dates = response.data.map((b) => ({
+        start: new Date(b.check_in),
+        end: new Date(b.check_out),
+      }));
 
-      // Step 2 — Initiate Khalti payment
-      const paymentRes = await api.post(
-        `/bookings/${newBooking.id}/initiate-payment/`,
-        {}
-      );
-
-      const { payment_url } = paymentRes.data;
-
-      if (payment_url) {
-        // Save booking id for after redirect
-        localStorage.setItem("pending_booking_id", newBooking.id);
-        localStorage.setItem("pending_booking_pidx", paymentRes.data.pidx);
-
-        // Redirect to Khalti
-        window.location.href = payment_url;
-      } else {
-        setError("Failed to get payment URL. Please try again.");
-      }
+      setBookedDates(dates);
     } catch (err) {
-      const errMsg =
-        err?.response?.data?.check_in?.[0] ||
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        "Something went wrong. Please try again.";
-      setError(errMsg);
-    } finally {
-      setPaymentLoading(false);
+      console.error("Error fetching booked dates:", err);
     }
   };
 
-  const handleClose = () => {
-    setStep(1);
-    setCheckIn("");
-    setCheckOut("");
-    setGuestsCount(1);
-    setSpecialRequests("");
-    setBooking(null);
+  const isDateBooked = (date) => {
+    if (!date) return false;
+    const d = new Date(date).setHours(0, 0, 0, 0);
+
+    return bookedDates.some((range) => {
+      const start = new Date(range.start).setHours(0, 0, 0, 0);
+      const end = new Date(range.end).setHours(0, 0, 0, 0);
+      // d < end because checkout day is available for check-in
+      return d >= start && d < end;
+    });
+  };
+
+
+
+  const onChange = (dates) => {
+    const [start, end] = dates;
+    setStartDate(start);
+    setEndDate(end);
     setError("");
+  };
+
+  const handleGuestChange = (type, action) => {
+    setGuests((prev) => {
+      const currentVal = prev[type];
+      const newVal = action === "plus" ? currentVal + 1 : currentVal - 1;
+
+      if (type === "adults" && newVal < 1) return prev;
+      if (newVal < 0) return prev;
+
+      const currentMainGuests = prev.adults + prev.children;
+      const nextMainGuests =
+        type === "adults" || type === "children"
+          ? currentMainGuests + (action === "plus" ? 1 : -1)
+          : currentMainGuests;
+
+      if (
+        (type === "adults" || type === "children") &&
+        nextMainGuests > maxGuests
+      ) {
+        return prev;
+      }
+
+      return { ...prev, [type]: newVal };
+    });
+  };
+
+  const handleBooking = () => {
+    if (!startDate || !endDate) {
+      setError("Please select a date range.");
+      return;
+    }
+
+    if (nights < 1) {
+      setError("Stay must be at least 1 night.");
+      return;
+    }
+
+    if (totalGuests > maxGuests) {
+      setError(`This place allows a maximum of ${maxGuests} guests.`);
+      return;
+    }
+
+    setError("");
+
+    navigate(`/checkout/${listing.id}`, {
+      state: {
+        startDate: formatLocalDate(startDate),
+        endDate: formatLocalDate(endDate),
+        guests,
+        specialRequests,
+        listing,
+        nights,
+      },
+    });
+
     onClose();
   };
 
+  if (!isOpen || !listing) return null;
+
   return (
-    <div className="booking-modal-overlay" onClick={handleClose}>
-      <div className="booking-modal" onClick={(e) => e.stopPropagation()}>
-
-        {/* Header */}
+    <div className="booking-modal-overlay" onClick={onClose}>
+      <div
+        className="booking-modal extended"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="booking-modal-header">
-          <h2>
-            {step === 1 && "Select Dates & Guests"}
-            {step === 2 && "Review & Pay"}
-          </h2>
-          <button className="booking-close-btn" onClick={handleClose}>✕</button>
+          <h2>How long do you want to stay?</h2>
+          <button onClick={onClose} className="booking-close-btn" type="button">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Step Indicator */}
-        <div className="booking-steps">
-          {[1, 2].map((s) => (
-            <div key={s} className={`booking-step ${step >= s ? "active" : ""}`}>
-              <div className="step-circle">{s}</div>
-              <span>{s === 1 ? "Dates" : "Pay"}</span>
+        <div className="booking-modal-scrollable">
+          <div className="calendar-section-premium">
+            <div className="date-summary-header">
+              <div className={`date-input-field ${!startDate ? "active" : ""}`}>
+                <label>CHECK-IN</label>
+                <span>
+                  {startDate
+                    ? startDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "Add date"}
+                </span>
+              </div>
+
+              <div
+                className={`date-input-field ${
+                  startDate && !endDate ? "active" : ""
+                }`}
+              >
+                <label>CHECKOUT</label>
+                <span>
+                  {endDate
+                    ? endDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "Add date"}
+                </span>
+              </div>
             </div>
-          ))}
-        </div>
 
-        {/* Error */}
-        {error && <div className="booking-error">{error}</div>}
+            <div className="compact-calendar-wrapper">
+              <DatePicker
+                selected={startDate}
+                onChange={onChange}
+                startDate={startDate}
+                endDate={endDate}
+                selectsRange
+                inline
+                monthsShown={2}
+                minDate={new Date()}
+                filterDate={(date) => !isDateBooked(date)}
+                dayClassName={(date) =>
+                  isDateBooked(date) ? "booked-day-unavailable" : undefined
+                }
+              />
 
-        {/* Step 1 — Dates & Guests */}
-        {step === 1 && (
-          <div className="booking-step-content">
-            <div className="booking-listing-info">
-              {listing.primary_image && (
-                <img
-                  src={
-                    listing.primary_image?.startsWith("http")
-                      ? listing.primary_image
-                      : `http://127.0.0.1:8000${listing.primary_image}`
-                  }
-                  alt={listing.title}
-                  className="booking-listing-img"
-                  onError={(e) => { e.target.style.display = "none"; }}
-                />
+            </div>
+          </div>
+
+          {startDate && endDate && nights > 0 && (
+            <div className="stay-info-preview">
+              <h3>
+                Rs. {Number(listing.price_per_night).toLocaleString()} x {nights}{" "}
+                nights
+              </h3>
+              <p className="total-preview">
+                Total price: Rs.{" "}
+                {(Number(listing.price_per_night) * nights).toLocaleString()}
+              </p>
+              <div className="date-text-rows">
+                <div className="date-text-row">
+                  Start Date:{" "}
+                  {startDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+                <div className="date-text-row">
+                  End Date:{" "}
+                  {endDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="guest-and-requests">
+            <div className="guest-selector-container">
+              <label className="bold-label">GUESTS</label>
+              <div
+                className="guest-dropdown-trigger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowGuestPicker(!showGuestPicker);
+                }}
+              >
+                <span>
+                  {totalGuests} guest{totalGuests > 1 ? "s" : ""}
+                  {guests.infants > 0
+                    ? `, ${guests.infants} infant${guests.infants > 1 ? "s" : ""}`
+                    : ""}
+                </span>
+                <ChevronDown size={18} />
+              </div>
+
+              {showGuestPicker && (
+                <div
+                  className="guest-picker-dropdown"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="guest-type-row">
+                    <div>
+                      <strong>Adults</strong>
+                      <span>Age 13+</span>
+                    </div>
+                    <div className="counter-controls">
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("adults", "minus")}
+                        disabled={guests.adults <= 1}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span>{guests.adults}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("adults", "plus")}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="guest-type-row">
+                    <div>
+                      <strong>Children</strong>
+                      <span>Ages 2-12</span>
+                    </div>
+                    <div className="counter-controls">
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("children", "minus")}
+                        disabled={guests.children <= 0}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span>{guests.children}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("children", "plus")}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="guest-type-row">
+                    <div>
+                      <strong>Infants</strong>
+                      <span>Under 2</span>
+                    </div>
+                    <div className="counter-controls">
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("infants", "minus")}
+                        disabled={guests.infants <= 0}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span>{guests.infants}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("infants", "plus")}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="guest-type-row">
+                    <div>
+                      <strong>Pets</strong>
+                      <span>Bringing service animal?</span>
+                    </div>
+                    <div className="counter-controls">
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("pets", "minus")}
+                        disabled={guests.pets <= 0}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span>{guests.pets}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleGuestChange("pets", "plus")}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="guest-limit-info">
+                    This place has a maximum of {maxGuests} guests, not including
+                    infants. Pets are not allowed unless specified.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="guest-picker-close"
+                    onClick={() => setShowGuestPicker(false)}
+                  >
+                    Close
+                  </button>
+                </div>
               )}
-              <div>
-                <h3>{listing.title}</h3>
-                <p>{listing.city}, {listing.country}</p>
-                <p className="booking-price">Rs. {listing.price_per_night} / night</p>
-              </div>
             </div>
 
-            <div className="booking-dates">
-              <div className="date-field">
-                <label>Check-in</label>
-                <input
-                  type="date"
-                  value={checkIn}
-                  min={today}
-                  onChange={(e) => {
-                    setCheckIn(e.target.value);
-                    if (checkOut && e.target.value >= checkOut) setCheckOut("");
-                  }}
-                />
-              </div>
-              <div className="date-field">
-                <label>Check-out</label>
-                <input
-                  type="date"
-                  value={checkOut}
-                  min={checkIn || today}
-                  onChange={(e) => setCheckOut(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {nights > 0 && (
-              <div className="nights-preview">
-                {nights} night{nights > 1 ? "s" : ""} · Rs. {total.toFixed(2)} total
-              </div>
-            )}
-
-            <div className="booking-guests">
-              <label>Guests (max {listing.max_guests})</label>
-              <div className="guest-counter">
-                <button
-                  onClick={() => setGuestsCount(Math.max(1, guestsCount - 1))}
-                  type="button"
-                >−</button>
-                <span>{guestsCount}</span>
-                <button
-                  onClick={() => setGuestsCount(Math.min(listing.max_guests, guestsCount + 1))}
-                  type="button"
-                >+</button>
-              </div>
-            </div>
-
-            <div className="booking-special">
-              <label>Special Requests (optional)</label>
+            <div className="special-requests-container">
+              <label className="bold-label">SPECIAL REQUESTS</label>
               <textarea
+                placeholder="Any special requests..."
                 value={specialRequests}
                 onChange={(e) => setSpecialRequests(e.target.value)}
-                placeholder="Any special requests..."
-                rows={3}
               />
             </div>
+          </div>
 
-            <button className="booking-btn-primary" onClick={handleNext}>
-              Continue 
+          {error && <div className="booking-error-message">{error}</div>}
+
+          <div className="booking-footer-v2">
+            <button
+              type="button"
+              className="booking-submit-btn"
+              onClick={handleBooking}
+            >
+              BOOKING
             </button>
           </div>
-        )}
-
-        {/* Step 2 — Review & Pay */}
-        {step === 2 && (
-          <div className="booking-step-content">
-            <div className="booking-summary">
-              <h3>{listing.title}</h3>
-              <p>
-                {checkIn} → {checkOut} · {nights} night{nights > 1 ? "s" : ""} · {guestsCount} guest{guestsCount > 1 ? "s" : ""}
-              </p>
-            </div>
-
-            <div className="booking-breakdown">
-              <div className="breakdown-row">
-                <span>Rs. {pricePerNight} × {nights} nights</span>
-                <span>Rs. {(pricePerNight * nights).toFixed(2)}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Cleaning fee</span>
-                <span>Rs. {cleaningFee.toFixed(2)}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Service fee (5%)</span>
-                <span>Rs. {serviceFee.toFixed(2)}</span>
-              </div>
-              <hr />
-              <div className="breakdown-row total">
-                <span>Total</span>
-                <span>Rs. {total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Khalti payment info */}
-            <div className="khalti-info">
-              <img
-                src="https://web.khalti.com/static/img/logo1.png"
-                alt="Khalti"
-                style={{ height: "28px" }}
-                onError={(e) => { e.target.style.display = "none"; }}
-              />
-              <p>You will be redirected to Khalti to complete payment securely.</p>
-            </div>
-
-            <div className="booking-notice">
-              <p>Booking is <strong>confirmed immediately</strong> after payment.</p>
-              <p>Host will be notified after your payment.</p>
-              <p>Same dates will be blocked for other guests.</p>
-            </div>
-
-            <div className="booking-btn-group">
-              <button
-                className="booking-btn-secondary"
-                onClick={() => setStep(1)}
-                disabled={paymentLoading}
-              >
-                ← Back
-              </button>
-              <button
-                className="booking-btn-khalti"
-                onClick={handlePayNow}
-                disabled={paymentLoading}
-              >
-                {paymentLoading ? "Processing..." : "Pay with Khalti"}
-              </button>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

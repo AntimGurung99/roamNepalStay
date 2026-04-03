@@ -6,6 +6,8 @@ import HostApplicationsManagement from '../components/admin/HostApplicationsMana
 import ListingsManagement from '../components/admin/ListingsManagement';
 import BookingsManagement from '../components/admin/BookingsManagement';
 import ReviewsManagement from '../components/admin/ReviewsManagement';
+import AdminCharts from '../components/admin/AdminCharts';
+import PlatformSettingsManagement from '../components/admin/PlatformSettingsManagement';
 
 // Admin Dashboard - Main admin panel with premium aesthetics
 const AdminDashboard = () => {
@@ -142,6 +144,13 @@ const AdminDashboard = () => {
                                 REVIEWS
                             </button>
                         </li>
+                        {user?.is_superuser && (
+                            <li className={activeTab === 'settings' ? 'active' : ''}>
+                             <button onClick={() => setActiveTab('settings')}>
+                                        SETTINGS
+                            </button>
+                          </li>
+                        )}
                     </ul>
                 </div>
             </nav>
@@ -154,6 +163,7 @@ const AdminDashboard = () => {
                     {activeTab === 'listings' && <ListingsManagement />}
                     {activeTab === 'bookings' && <BookingsManagement />}
                     {activeTab === 'reviews' && <ReviewsManagement />}
+                    {activeTab === 'settings' && user?.is_superuser && <PlatformSettingsManagement />}
                 </main>
             </div>
         </div>
@@ -215,6 +225,8 @@ const DashboardOverview = ({ stats }) => {
                 </div>
             </div>
 
+            <AdminCharts stats={stats} />
+            
             <div className="recent-activities">
                 <div className="recent-section card-elevated">
                     <h3>Latest Bookings</h3>

@@ -128,9 +128,6 @@ return (
               style = {{marginTop:10, background: "#0a3323"}}>
                 {resending ? "Resending...":"Resend OTP"}
             </button>
-            <p className="verify-footer" style={{marginTop:12}}>
-              Back to <Link to="/login">Login</Link>
-            </p>
             </form>
             </div>
             </div>

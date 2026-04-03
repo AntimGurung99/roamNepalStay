@@ -95,31 +95,36 @@
 
 .admin-nav-list {
     list-style: none;
-    padding: 0 1rem;
+    padding: 0 2rem;
     margin: 0;
     display: flex;
     justify-content: center;
-    min-width: max-content; /* Ensures buttons don't wrap and are scrollable */
+    align-items: center;
+    gap: 1.4rem; /* adds space between each nav item */
+    min-width: max-content;
 }
 
 .admin-nav-list li {
     margin: 0;
+    flex-shrink: 0;
 }
-
 .admin-nav-list button {
-    padding: 1.25rem 1.8rem;
+    padding: 1.35rem 2.4rem; /* bigger horizontal + vertical spacing */
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
     color: #718096;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-bottom: 3px solid transparent;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.6rem;
     white-space: nowrap;
+    min-width: 150px; /* makes each tab wider and more spacious */
 }
 
 .tab-icon {
@@ -129,12 +134,14 @@
 .admin-nav-list button:hover {
     color: #4a5568;
     background: rgba(102, 126, 234, 0.05);
+    border-radius: 10px 10px 0 0;
 }
 
 .admin-nav-list li.active button {
     color: #667eea;
     border-bottom-color: #667eea;
     background: rgba(102, 126, 234, 0.08);
+    border-radius: 10px 10px 0 0;
 }
 
 .notification-badge {
@@ -320,18 +327,13 @@
     transform: translateY(-5px);
 }
 
-.stat-card.highlight {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-}
-
+.stat-card.highlight,
 .stat-card.warning {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #444;
-    border: none;
+    background: #ffffff;
+    color: #2d3748;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
 .stat-icon {
     display: none;
 }
@@ -473,3 +475,4 @@
         font-size: 1.5rem;
     }
 }
+

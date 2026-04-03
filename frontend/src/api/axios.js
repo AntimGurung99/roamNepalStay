@@ -1,10 +1,10 @@
 import axios from "axios";
 
-const api = axios.create({
+const API = axios.create({
   baseURL: "http://127.0.0.1:8000/api",
 });
 
-api.interceptors.request.use((config) => {
+API.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -12,4 +12,49 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export default api;
+export const bookingsAPI = {
+  createBooking: (data) => API.post("/bookings/", data),
+  getMyBookings: () => API.get("/bookings/my/"),
+  getBookingDetails: (id) => API.get(`/bookings/${id}/`),
+  cancelBooking: (id) => API.post(`/bookings/${id}/cancel/`),
+  downloadReceipt: (id) =>
+    API.get(`/bookings/${id}/receipt/`, {
+      responseType: "blob",
+    }),
+};
+
+export const paymentsAPI = {
+  initiateKhaltiPayment: (bookingId) =>
+    API.post(`/bookings/${bookingId}/initiate-payment/`),
+
+  verifyKhaltiPayment: (data) =>
+    API.post("/bookings/verify-payment/", data),
+
+  initiateEsewaPayment: (bookingId) =>
+    API.post(`/bookings/${bookingId}/initiate-esewa/`),
+
+  verifyEsewaPayment: (data) =>
+    API.post("/bookings/verify-esewa-payment/", data),
+
+  selectCashInHand: (bookingId) =>
+    API.post(`/bookings/${bookingId}/cash-in-hand/`),
+};
+
+export const reviewsAPI = {
+  createReview: (bookingId, data) =>
+    API.post(`/bookings/${bookingId}/review/`, data),
+};
+
+export const listingsAPI = {
+  getListing: (id) => API.get(`/listings/${id}/`),
+  getBookedDates: (id) => API.get(`/listings/${id}/booked_dates/`),
+  getMapListings: (params) => API.get("/listings/map/", { params }),
+};
+
+export const platformSettingsAPI = {
+  getSettings: () => API.get("/platform-settings/"),
+  updateSettings: (data) => API.patch("/platform-settings/", data),
+  getPublicFee: () => API.get("/public/platform-fee/"),
+};
+
+export default API;

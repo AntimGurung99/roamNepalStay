@@ -13,7 +13,10 @@ const ListingsManagement = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     useEffect(() => {
-        fetchListings();
+        const timeoutId = setTimeout(() => {
+            fetchListings();
+        }, 500);
+        return () => clearTimeout(timeoutId);
     }, [filterStatus, searchTerm]);
 
     useEffect(() => {

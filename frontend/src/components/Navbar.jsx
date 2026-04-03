@@ -1,6 +1,5 @@
-import {useEffect,useRef, useState} from "react";
-import {Link, useNavigate} from "react-router-dom";
-import axios from "axios";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import "../styles/Navbar.css";
 import logo from "../assets/mainlogo.jpg";
@@ -9,8 +8,7 @@ import CreateListingModal from "./CreateListingModal";
 import ProfileIcon from "../pages/ProfileIcon";
 import { RxHamburgerMenu } from "react-icons/rx";
 
-
-function Navbar() {
+function Navbar({ searchTerm, setSearchTerm }) {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [isHostModalOpen, setIsHostModalOpen] = useState(false);
@@ -19,7 +17,7 @@ function Navbar() {
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
-    useEffect(() => {
+  useEffect(() => {
     const fetchBookings = async () => {
       try {
         const res = await api.get("/host/bookings/");
@@ -32,29 +30,31 @@ function Navbar() {
     fetchBookings();
   }, []);
 
-  useEffect (() =>{
+  useEffect(() => {
     const storedUser = localStorage.getItem("user");
 
-    if(storedUser){
-      try{
+    if (storedUser) {
+      try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
 
-        refreshUserData(); //backend bata latest user data launa ko lagi
-      }catch(error){
-        console.error("User parse error:",error);
-
+        refreshUserData();
+      } catch (error) {
+        console.error("User parse error:", error);
       }
+    }
 
-      const onDocClick = (e) => {
-        if (!menuRef.current) return;
-        if (!menuRef.current.contains(e.target)) setOpen(false);
-      };
-
-      document.addEventListener("mousedown", onDocClick);
-
+    const onDocClick = (e) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target)) setOpen(false);
     };
-  },[]);
+
+    document.addEventListener("mousedown", onDocClick);
+
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+    };
+  }, []);
 
   const refreshUserData = async () => {
     try {
@@ -73,19 +73,19 @@ function Navbar() {
     }
   };
 
-  useEffect (()=>{
+  useEffect(() => {
     const handleUpdate = () => refreshUserData();
     window.addEventListener("wishlistUpdate", handleUpdate);
-    return () =>
-      window.removeEventListener("wishlistUpdate",handleUpdate);
-  },[]);
 
-  const go = (path) =>{
+    return () => window.removeEventListener("wishlistUpdate", handleUpdate);
+  }, []);
+
+  const go = (path) => {
     setOpen(false);
     navigate(path);
   };
 
-  const handleLogout = () =>{
+  const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
@@ -96,8 +96,8 @@ function Navbar() {
     navigate("/login");
   };
 
-  const handleBecomeHost = () =>{
-    if(!user){
+  const handleBecomeHost = () => {
+    if (!user) {
       alert("Please login first to become a host.");
       navigate("/login");
       return;
@@ -108,173 +108,182 @@ function Navbar() {
   const handleAddListing = () => {
     setIsListingModalOpen(true);
   };
-return (
+
+  return (
     <>
-      {!isListingModalOpen && !isHostModalOpen && (
-        <header className="nav">
+      <header className="nav">
+        {/* LEFT */}
+        <div className="nav__left">
+          <Link to="/" className="nav__brand">
+            <img src={logo} alt="Roam Nepal Stay" className="nav__logo" />
+            <span className="nav__logoText">Roam Nepal Stay</span>
+          </Link>
+        </div>
 
-          {/* LEFT */}
-          <div className="nav__left">
-            <Link to="/" className="nav__brand">
-              <img src={logo} alt="Roam Nepal Stay" className="nav__logo" />
-              <span className="nav__logoText">Roam Nepal Stay</span>
-            </Link>
+        {/* CENTER */}
+        <div className="nav__center">
+          <div className="nav__search">
+            <input
+              type="text"
+              placeholder="Search by title, city, district..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                }
+              }}
+            />
+            <button type="button">Search</button>
           </div>
+        </div>
 
-          {/* CENTER */}
-          <div className="nav__center">
-            <div className="nav__search">
-              <input placeholder="Search..." />
-              <button type="button">Search</button>
+        {/* RIGHT */}
+        <div className="nav__right">
+
+          {/* ✅ ADD THIS (Explore Map Button) */}
+          {/* <Link to="/explore-map" className="nav__exploreMap">
+            Explore Map
+          </Link> */}
+          <Link to="/explore-map" className="nav__exploreMap">
+          <i className="bi bi-geo-alt-fill" style={{ marginRight: "6px" }}></i>
+          Explore Map
+        </Link>
+
+          {/* HOST BUTTON */}
+          {user?.is_host ? (
+            <button
+              className="nav__hostBtn"
+              type="button"
+              onClick={handleAddListing}
+            >
+              Add Listing
+            </button>
+          ) : user?.host_application_status === "pending" ? (
+            <button
+              className="nav__hostBtn nav__hostBtn--pending"
+              type="button"
+              disabled
+            >
+              Pending Review
+            </button>
+          ) : (
+            <button
+              className="nav__hostBtn"
+              type="button"
+              onClick={handleBecomeHost}
+            >
+              Become A Host
+            </button>
+          )}
+
+          {/* PROFILE ICON */}
+          {user && (
+            <div
+              className="nav__profileIcon"
+              onClick={() => navigate("/profile")}
+              style={{ cursor: "pointer" }}
+            >
+              <ProfileIcon user={user} />
             </div>
-          </div>
+          )}
 
-          {/* RIGHT */}
-          <div className="nav__right">
+          {/* MENU */}
+          <div className="nav__profile" ref={menuRef}>
+            <button
+              className="nav__profileBtn"
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+            >
+              <span className="nav__hamburger">
+                <RxHamburgerMenu />
+              </span>
+            </button>
 
-            {/* HOST BUTTON */}
-            {user?.is_host ? (
-              <button
-                className="nav__hostBtn"
-                type="button"
-                onClick={handleAddListing}
-              >
-                Add Listing
-              </button>
-            ) : user?.host_application_status === "pending" ? (
-              <button
-                className="nav__hostBtn nav__hostBtn--pending"
-                type="button"
-                disabled
-              >
-                Pending Review
-              </button>
-            ) : (
-              <button
-                className="nav__hostBtn"
-                type="button"
-                onClick={handleBecomeHost}
-              >
-                Become A Host
-              </button>
-            )}
+            {open && (
+              <div className="nav__dropdown">
+                {user ? (
+                  <>
+                    <div className="nav__userGreeting">
+                      Hello, {user.first_name || user.email}
+                    </div>
 
-            {/* PROFILE ICON */}
-            {user && (
-              <div
-                className="nav__profileIcon"
-                onClick={() => navigate("/profile")}
-                style={{ cursor: "pointer" }}
-              >
-                <ProfileIcon user={user} />
+                    {user.is_host && (
+                      <button
+                        className="nav__dropItem"
+                        onClick={() => go("/my-properties")}
+                      >
+                        My Properties
+                      </button>
+                    )}
+
+                    <button
+                      className="nav__dropItem"
+                      onClick={() => go("/my-bookings")}
+                    >
+                      My Bookings
+                    </button>
+
+                    {user.is_host && (
+                      <button
+                        className="nav__dropItem"
+                        onClick={() => go("/host/dashboard")}
+                      >
+                        Host Dashboard
+                      </button>
+                    )}
+
+                    <button
+                      className="nav__dropItem"
+                      onClick={() => go("/wishlist")}
+                    >
+                      Wishlist {user.wishlist_count > 0 && `(${user.wishlist_count})`}
+                    </button>
+
+                    {(user.is_staff || user.is_superuser) && (
+                      <button
+                        className="nav__dropItem"
+                        onClick={() => go("/admin")}
+                      >
+                        Admin Dashboard
+                      </button>
+                    )}
+
+                    <button className="nav__dropItem" onClick={handleLogout}>
+                      Log Out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="nav__dropItem nav__dropItem--accent"
+                      onClick={() => go("/login")}
+                    >
+                      Log In
+                    </button>
+
+                    <button
+                      className="nav__dropItem nav__dropItem--accent"
+                      onClick={() => go("/register")}
+                    >
+                      Register
+                    </button>
+                  </>
+                )}
               </div>
             )}
-
-            {/* MENU */}
-            <div className="nav__profile" ref={menuRef}>
-              <button
-                className="nav__profileBtn"
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-              >
-                <span className="nav__hamburger">
-             <RxHamburgerMenu />
-        </span>
-              </button>
-
-              {open && (
-                <div className="nav__dropdown">
-                  {user ? (
-                    <>
-                      <div className="nav__userGreeting">
-                        Hello, {user.first_name || user.email}
-                      </div>
-
-                      {/* <button
-                        className="nav__dropItem"
-                        onClick={() => go("/profile")}
-                      >
-                        Profile
-                      </button> */}
-
-                      {user.is_host && (
-                        <button
-                          className="nav__dropItem"
-                          onClick={() => go("/my-properties")}
-                        >
-                          My Properties
-                        </button>
-                      )}
-
-                      <button
-                        className="nav__dropItem"
-                        onClick={() => go("/my-bookings")}
-                      >
-                        My Bookings
-                      </button>
-
-                      {user.is_host && (
-                        <button
-                          className="nav__dropItem"
-                          onClick={() => go("/host/dashboard")}
-                        >
-                          Host Dashboard
-                        </button>
-                      )}
-
-                      <button
-                        className="nav__dropItem"
-                        onClick={() => go("/wishlist")}
-                      >
-                        Wishlist{" "}
-                        {user.wishlist_count > 0 &&
-                          `(${user.wishlist_count})`}
-                      </button>
-
-                      {(user.is_staff || user.is_superuser) && (
-                        <button
-                          className="nav__dropItem"
-                          onClick={() => go("/admin")}
-                        >
-                          Admin Dashboard
-                        </button>
-                      )}
-
-                      <button
-                        className="nav__dropItem"
-                        onClick={handleLogout}
-                       >
-                        Log Out
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="nav__dropItem nav__dropItem--accent"
-                        onClick={() => go("/login")}
-                      >
-                        Log In
-                      </button>
-
-                      <button
-                        className="nav__dropItem nav__dropItem--accent"
-                        onClick={() => go("/register")}
-                      >
-                        Register
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
-        </header>
-      )}
+        </div>
+      </header>
 
       <HostApplicationModal
         isOpen={isHostModalOpen}
         onClose={() => setIsHostModalOpen(false)}
+        onSuccess={() => {
+          setIsHostModalOpen(false);
+          refreshUserData();
+        }}
       />
 
       <CreateListingModal
