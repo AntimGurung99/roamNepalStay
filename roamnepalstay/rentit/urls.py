@@ -67,9 +67,15 @@ urlpatterns = [
         HostApplicationCreateView.as_view(),
         name="host-application-create",
     ),
+    path(
+        "host-applications/me/",
+        HostApplicationCreateView.as_view(),
+        name="host-application-me",
+    ),
     # OPTVERIFY AND RESEND
     path("auth/verify-otp/", VerifyOTPAPIView.as_view(), name="verify-otp"),
     path("auth/resend-otp/", ResendOTPAPIView.as_view(), name="resend-otp"),
+    path("listings/map/", ListingMapAPIView.as_view(), name="listings-map"),
     # Admin routes router bata
     path("", include(router.urls)),
     # bookings urls
@@ -128,6 +134,4 @@ urlpatterns = [
         PublicPlatformFeeAPIView.as_view(),
         name="public-platform-fee",
     ),
-    # Map
-    path("listings/map/", ListingMapAPIView.as_view(), name="listings-map"),
 ]

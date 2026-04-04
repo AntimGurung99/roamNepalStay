@@ -253,9 +253,54 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
 
 # host application ko dekhauna ko lagi
+# class HostApplicationSerializer(serializers.ModelSerializer):
+#     user_name = serializers.SerializerMethodField()
+#     user_email = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = HostApplication
+#         fields = [
+#             "id",
+#             "user",
+#             "user_name",
+#             "user_email",
+#             "citizenship_number",
+#             "citizenship_image",
+#             "business_name",
+#             "business_registration",
+#             "tax_number",
+#             "bank_name",
+#             "account_number",
+#             "account_holder_name",
+#             "status",
+#             "reviewed_by",
+#             "review_notes",
+#             "reviewed_at",
+#             "applied_at",
+#             "updated_at",
+#         ]
+#         read_only_fields = [
+#             "user",
+#             "status",
+#             "reviewed_by",
+#             "reviewed_at",
+#             "review_notes",
+#         ]
+
+#     def get_user_name(self, obj):
+#         return f"{obj.user.first_name} {obj.user.last_name}"
+
+#     def get_user_email(self, obj):
+#         return obj.user.email
+
+from rest_framework import serializers
+from .models import HostApplication
+
+
 class HostApplicationSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
+    user_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = HostApplication
@@ -264,18 +309,27 @@ class HostApplicationSerializer(serializers.ModelSerializer):
             "user",
             "user_name",
             "user_email",
+            "user_phone",
             "citizenship_number",
-            "citizenship_image",
-            "business_name",
-            "business_registration",
-            "tax_number",
+            "citizenship_front_image",
+            "selfie_with_id",
+            "permanent_address",
+            "property_address",
+            "ownership_document",
             "bank_name",
             "account_number",
             "account_holder_name",
+            "business_name",
+            "pan_card_image",
+            "agreed_to_terms",
             "status",
             "reviewed_by",
             "review_notes",
             "reviewed_at",
+            "phone_verified_check",
+            "identity_verified_check",
+            "property_verified_check",
+            "bank_verified_check",
             "applied_at",
             "updated_at",
         ]
@@ -283,15 +337,80 @@ class HostApplicationSerializer(serializers.ModelSerializer):
             "user",
             "status",
             "reviewed_by",
-            "reviewed_at",
             "review_notes",
+            "reviewed_at",
+            "phone_verified_check",
+            "identity_verified_check",
+            "property_verified_check",
+            "bank_verified_check",
+            "applied_at",
+            "updated_at",
         ]
 
     def get_user_name(self, obj):
-        return f"{obj.user.first_name} {obj.user.last_name}"
+        full_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full_name if full_name else obj.user.username
 
     def get_user_email(self, obj):
         return obj.user.email
+
+    def get_user_phone(self, obj):
+        # returns phone if exists, else None
+        return getattr(obj.user, "phone_number", None)
+
+    def validate_account_number(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Account number is required.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs.get("ownership_document"):
+            raise serializers.ValidationError(
+                {"ownership_document": "Ownership document is required."}
+            )
+
+        if not attrs.get("agreed_to_terms"):
+            raise serializers.ValidationError(
+                {"agreed_to_terms": "You must agree to the terms and conditions."}
+            )
+
+        business_name = attrs.get("business_name")
+        pan_card_image = attrs.get("pan_card_image")
+
+        if pan_card_image and not business_name:
+            raise serializers.ValidationError(
+                {
+                    "business_name": "Business name is required if PAN card image is uploaded."
+                }
+            )
+
+        return attrs
+
+    # def create(self, validated_data):
+    #     user = self.context["request"].user
+    #     return HostApplication.objects.create(user=user, **validated_data)
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data.pop("user", None)
+        return HostApplication.objects.create(user=user, **validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop("user", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.status = "pending"
+        instance.reviewed_by = None
+        instance.review_notes = ""
+        instance.reviewed_at = None
+        instance.phone_verified_check = False
+        instance.identity_verified_check = False
+        instance.property_verified_check = False
+        instance.bank_verified_check = False
+        instance.save()
+        return instance
 
 
 # listing image ko lagi serializer

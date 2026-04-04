@@ -511,73 +511,234 @@ class AdminUserViewSet(GenericViewSet):
             )
 
 
+# class AdminHostApplicationViewSet(GenericViewSet):
+#     permission_classes = [IsAuthenticated, IsAdminUserRole]
+#     queryset = HostApplication.objects.all()
+
+#     def list(self, request):
+#         applications = HostApplication.objects.select_related("user").order_by(
+#             "-applied_at"
+#         )
+#         status_filter = request.query_params.get("status", "")
+#         if status_filter:
+#             applications = applications.filter(status=status_filter)
+#         page = self.paginate_queryset(applications)
+#         if page is not None:
+#             serializer = HostApplicationSerializer(page, many=True)
+#             return self.get_paginated_response(serializer.data)
+
+#         serializer = HostApplicationSerializer(applications, many=True)
+#         return Response(serializer.data)
+
+#     def retrieve(self, request, pk=None):
+#         try:
+#             application = HostApplication.objects.select_related("user").get(pk=pk)
+#             serializer = HostApplicationSerializer(application)
+#             return Response(serializer.data)
+#         except HostApplication.DoesNotExist:
+#             return Response(
+#                 {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+#             )
+
+#     @action(detail=True, methods=["post"])
+#     def approve(self, request, pk=None):
+#         try:
+#             application = HostApplication.objects.get(pk=pk)
+#             application.status = "approved"
+#             application.reviewed_by = request.user
+#             application.reviewed_at = timezone.now()
+#             application.review_notes = request.data.get("notes", "")
+#             application.save()
+
+#             user = application.user
+#             user.is_host = True
+#             user.host_application_status = "approved"
+#             user.save()
+#             return Response({"detail": "Host application approved successfully."})
+#         except HostApplication.DoesNotExist:
+#             return Response(
+#                 {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+#             )
+
+#     @action(detail=True, methods=["post"])
+#     def reject(self, request, pk=None):
+#         try:
+#             application = HostApplication.objects.get(pk=pk)
+#             application.status = "rejected"
+#             application.reviewed_by = request.user
+#             application.reviewed_at = timezone.now()
+#             application.review_notes = request.data.get("notes", "Application rejected")
+#             application.save()
+
+
+#             user = application.user
+#             user.host_application_status = "rejected"
+#             user.save()
+#             return Response({"detail": "Host application rejected successfully."})
+#         except HostApplication.DoesNotExist:
+#             return Response(
+#                 {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+#             )
 class AdminHostApplicationViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated, IsAdminUserRole]
-    queryset = HostApplication.objects.all()
+    queryset = HostApplication.objects.select_related("user").all()
 
     def list(self, request):
         applications = HostApplication.objects.select_related("user").order_by(
             "-applied_at"
         )
-        status_filter = request.query_params.get("status", "")
+
+        status_filter = request.query_params.get("status", "").strip()
         if status_filter:
             applications = applications.filter(status=status_filter)
+
         page = self.paginate_queryset(applications)
         if page is not None:
-            serializer = HostApplicationSerializer(page, many=True)
+            serializer = HostApplicationSerializer(
+                page, many=True, context={"request": request}
+            )
             return self.get_paginated_response(serializer.data)
 
-        serializer = HostApplicationSerializer(applications, many=True)
+        serializer = HostApplicationSerializer(
+            applications, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         try:
             application = HostApplication.objects.select_related("user").get(pk=pk)
-            serializer = HostApplicationSerializer(application)
-            return Response(serializer.data)
         except HostApplication.DoesNotExist:
             return Response(
-                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
+
+        serializer = HostApplicationSerializer(
+            application, context={"request": request}
+        )
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         try:
-            application = HostApplication.objects.get(pk=pk)
-            application.status = "approved"
-            application.reviewed_by = request.user
-            application.reviewed_at = timezone.now()
-            application.review_notes = request.data.get("notes", "")
-            application.save()
-
-            user = application.user
-            user.is_host = True
-            user.host_application_status = "approved"
-            user.save()
-            return Response({"detail": "Host application approved successfully."})
+            application = HostApplication.objects.select_related("user").get(pk=pk)
         except HostApplication.DoesNotExist:
             return Response(
-                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
+
+        required_checks = [
+            application.phone_verified_check,
+            application.identity_verified_check,
+            application.property_verified_check,
+            application.bank_verified_check,
+        ]
+
+        if not all(required_checks):
+            return Response(
+                {"detail": "Complete all verification checks before approval."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        application.status = "approved"
+        application.reviewed_by = request.user
+        application.reviewed_at = timezone.now()
+        application.review_notes = request.data.get("notes", "")
+        application.save()
+
+        user = application.user
+        user.is_host = True
+        user.host_application_status = "approved"
+        user.save(update_fields=["is_host", "host_application_status"])
+
+        return Response({"detail": "Host application approved successfully."})
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         try:
-            application = HostApplication.objects.get(pk=pk)
-            application.status = "rejected"
-            application.reviewed_by = request.user
-            application.reviewed_at = timezone.now()
-            application.review_notes = request.data.get("notes", "Application rejected")
-            application.save()
-
-            user = application.user
-            user.host_application_status = "rejected"
-            user.save()
-            return Response({"detail": "Host application rejected successfully."})
+            application = HostApplication.objects.select_related("user").get(pk=pk)
         except HostApplication.DoesNotExist:
             return Response(
-                {"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Application not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
+
+        application.status = "rejected"
+        application.reviewed_by = request.user
+        application.reviewed_at = timezone.now()
+        application.review_notes = request.data.get("notes", "Application rejected")
+        application.save()
+
+        user = application.user
+        user.is_host = False
+        user.host_application_status = "rejected"
+        user.save(update_fields=["is_host", "host_application_status"])
+
+        return Response({"detail": "Host application rejected successfully."})
+
+    @action(detail=True, methods=["post"])
+    def needs_more_info(self, request, pk=None):
+        try:
+            application = HostApplication.objects.select_related("user").get(pk=pk)
+        except HostApplication.DoesNotExist:
+            return Response(
+                {"detail": "Application not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        application.status = "needs_more_info"
+        application.reviewed_by = request.user
+        application.reviewed_at = timezone.now()
+        application.review_notes = request.data.get(
+            "notes",
+            "Please provide more information or clearer documents.",
+        )
+        application.save()
+
+        user = application.user
+        user.is_host = False
+        user.host_application_status = "needs_more_info"
+        user.save(update_fields=["is_host", "host_application_status"])
+
+        return Response(
+            {"detail": "Application marked as needs more info successfully."}
+        )
+
+    @action(detail=True, methods=["patch"])
+    def update_review(self, request, pk=None):
+        try:
+            application = HostApplication.objects.select_related("user").get(pk=pk)
+        except HostApplication.DoesNotExist:
+            return Response(
+                {"detail": "Application not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        allowed_fields = [
+            "phone_verified_check",
+            "identity_verified_check",
+            "property_verified_check",
+            "bank_verified_check",
+            "review_notes",
+        ]
+
+        updated = False
+
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(application, field, request.data.get(field))
+                updated = True
+
+        if updated:
+            application.reviewed_by = request.user
+            application.reviewed_at = timezone.now()
+            application.save()
+
+        serializer = HostApplicationSerializer(
+            application, context={"request": request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AdminListingViewSet(GenericViewSet):
@@ -737,21 +898,98 @@ class AdminReviewViewSet(GenericViewSet):
             )
 
 
+# class HostApplicationCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+
+#     def post(self, request):
+#         if HostApplication.objects.filter(user=request.user).exists():
+#             return Response(
+#                 {"detail": "You have already submitted an application."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#         serializer = HostApplicationSerializer(data=request.data)
+#         if serializer.is_valid():
+#             serializer.save(user=request.user)
+#             request.user.host_application_status = "pending"
+#             request.user.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class HostApplicationCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         if HostApplication.objects.filter(user=request.user).exists():
+#             return Response(
+#                 {"detail": "You have already submitted an application."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         serializer = HostApplicationSerializer(
+#             data=request.data, context={"request": request}
+#         )
+
+#         if serializer.is_valid():
+#             serializer.save()
+
+#             request.user.host_application_status = "pending"
+#             request.user.save(update_fields=["host_application_status"])
+
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class HostApplicationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        if HostApplication.objects.filter(user=request.user).exists():
+    def get(self, request):
+        try:
+            application = HostApplication.objects.get(user=request.user)
+            serializer = HostApplicationSerializer(
+                application, context={"request": request}
+            )
+            return Response(serializer.data)
+        except HostApplication.DoesNotExist:
             return Response(
-                {"detail": "You have already submitted an application."},
+                {"detail": "Host application not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    def post(self, request):
+        if request.user.host_application_status in ["pending", "approved"]:
+            return Response(
+                {"detail": "You already have an active application."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        serializer = HostApplicationSerializer(data=request.data)
+
+        try:
+            application = HostApplication.objects.get(user=request.user)
+            serializer = HostApplicationSerializer(
+                application,
+                data=request.data,
+                partial=True,
+                context={"request": request},
+            )
+            is_update = True
+        except HostApplication.DoesNotExist:
+            serializer = HostApplicationSerializer(
+                data=request.data,
+                context={"request": request},
+            )
+            is_update = False
+
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            serializer.save()
+
             request.user.host_application_status = "pending"
-            request.user.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            request.user.save(update_fields=["host_application_status"])
+
+            return Response(
+                serializer.data,
+                status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
+            )
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -876,63 +1114,6 @@ class ListingViewSet(GenericViewSet):
         return Response(serializer.data)
 
 
-# class ListingMapAPIView(APIView):
-#     permission_classes = [AllowAny]
-
-#     def get(self, request):
-#         listings = (
-#             Listing.objects.filter(status="published")
-#             .exclude(latitude__isnull=True)
-#             .exclude(longitude__isnull=True)
-#             .order_by("-created_at")
-#         )
-
-#         search = request.query_params.get("search", "").strip()
-#         min_price = request.query_params.get("min_price")
-#         max_price = request.query_params.get("max_price")
-#         city = request.query_params.get("city", "").strip()
-
-#         north = request.query_params.get("north")
-#         south = request.query_params.get("south")
-#         east = request.query_params.get("east")
-#         west = request.query_params.get("west")
-
-#         if search:
-#             listings = listings.filter(
-#                 Q(title__icontains=search)
-#                 | Q(city__icontains=search)
-#                 | Q(district__icontains=search)
-#                 | Q(region__icontains=search)
-#                 | Q(province__icontains=search)
-#                 | Q(address__icontains=search)
-#                 | Q(category__icontains=search)
-#                 | Q(property_type__icontains=search)
-#                 | Q(description__icontains=search)
-#             )
-
-#         if city:
-#             listings = listings.filter(city__icontains=city)
-
-#         if min_price:
-#             listings = listings.filter(price_per_night__gte=min_price)
-
-#         if max_price:
-#             listings = listings.filter(price_per_night__lte=max_price)
-
-#         if north and south and east and west:
-#             listings = listings.filter(
-#                 latitude__lte=float(north),
-#                 latitude__gte=float(south),
-#                 longitude__lte=float(east),
-#                 longitude__gte=float(west),
-#             )
-
-#         serializer = ListingMapSerializer(
-#             listings[:300], many=True, context={"request": request}
-#         )
-#         return Response(serializer.data)
-
-
 class ListingMapAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -944,7 +1125,7 @@ class ListingMapAPIView(APIView):
             .order_by("-created_at")
         )
 
-        district = request.query_params.get("district", "").strip()
+        search = request.query_params.get("search", "").strip()
         min_price = request.query_params.get("min_price")
         max_price = request.query_params.get("max_price")
 
@@ -953,8 +1134,17 @@ class ListingMapAPIView(APIView):
         east = request.query_params.get("east")
         west = request.query_params.get("west")
 
-        if district:
-            listings = listings.filter(district__icontains=district)
+        if search:
+            listings = listings.filter(
+                Q(title__icontains=search)
+                | Q(address__icontains=search)
+                | Q(city__icontains=search)
+                | Q(district__icontains=search)
+                | Q(province__icontains=search)
+                | Q(region__icontains=search)
+                | Q(property_type__icontains=search)
+                | Q(category__icontains=search)
+            )
 
         if min_price:
             listings = listings.filter(price_per_night__gte=min_price)
@@ -962,7 +1152,7 @@ class ListingMapAPIView(APIView):
         if max_price:
             listings = listings.filter(price_per_night__lte=max_price)
 
-        if north and south and east and west:
+        if north and south and east and west and not search:
             listings = listings.filter(
                 latitude__lte=float(north),
                 latitude__gte=float(south),

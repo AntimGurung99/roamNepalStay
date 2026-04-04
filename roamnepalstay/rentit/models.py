@@ -52,6 +52,7 @@ class User(AbstractUser):
         choices=[
             ("none", "No Application"),
             ("pending", "Pending Review"),
+            ("needs_more_info", "Needs More Info"),
             ("approved", "Approved"),
             ("rejected", "Rejected"),
         ],
@@ -110,53 +111,122 @@ class PendingRegistration(models.Model):
 
 
 # host banna chaahnay user haru ko lagi detials store garna
+# class HostApplication(models.Model):
+#     user = models.OneToOneField(
+#         User, on_delete=models.CASCADE, related_name="host_application"
+#     )
+
+# Personal Information
+# citizenship_number = models.CharField(max_length=20)
+# citizenship_image = models.ImageField(upload_to="citizenship_images/")
+
+# Business Information
+# business_name = models.CharField(max_length=200, blank=True)
+# business_registration = models.CharField(max_length=50, blank=True)
+# tax_number = models.CharField(max_length=20, blank=True)
+
+# Bank Details
+# bank_name = models.CharField(max_length=100)
+# account_number = models.CharField(max_length=30)
+# account_holder_name = models.CharField(max_length=200)
+
+# Application Status
+# status = models.CharField(
+#     max_length=20,
+#     choices=[
+#         ("pending", "Pending Review"),
+#         ("approved", "Approved"),
+#         ("rejected", "Rejected"),
+#     ],
+#     default="pending",
+# )
+
+# Admin review details
+# reviewed_by = models.ForeignKey(
+#     User,
+#     on_delete=models.SET_NULL,
+#     null=True,
+#     blank=True,
+#     related_name="reviewed_applications",
+# )
+# review_notes = models.TextField(blank=True)
+# reviewed_at = models.DateTimeField(null=True, blank=True)
+
+# Timestamps
+# applied_at = models.DateTimeField(auto_now_add=True)
+# updated_at = models.DateTimeField(auto_now=True)
+
+# def __str__(self):
+#     return f"Host Application - {self.user.first_name} {self.user.last_name}"
+
+
 class HostApplication(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("needs_more_info", "Needs More Info"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="host_application"
     )
 
-    # Personal Information
-    citizenship_number = models.CharField(max_length=20)
-    citizenship_image = models.ImageField(upload_to="citizenship_images/")
+    # Basic identity
+    citizenship_number = models.CharField(max_length=30)
+    citizenship_front_image = models.ImageField(
+        upload_to="host_verification/citizenship/", null=True, blank=True
+    )
+    selfie_with_id = models.ImageField(
+        upload_to="host_verification/selfie/", null=True, blank=True
+    )
+    permanent_address = models.TextField(blank=True, null=True)
 
-    # Business Information
-    business_name = models.CharField(max_length=200, blank=True)
-    business_registration = models.CharField(max_length=50, blank=True)
-    tax_number = models.CharField(max_length=20, blank=True)
+    # Property info (ONLY OWNER)
+    property_address = models.TextField(null=True, blank=True)
+    ownership_document = models.FileField(
+        upload_to="host_verification/property_docs/", null=True, blank=True
+    )
 
-    # Bank Details
+    # Bank info
     bank_name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=30)
     account_holder_name = models.CharField(max_length=200)
 
-    # Application Status
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ("pending", "Pending Review"),
-            ("approved", "Approved"),
-            ("rejected", "Rejected"),
-        ],
-        default="pending",
+    # optional
+
+    business_name = models.CharField(max_length=200, blank=True)
+
+    pan_card_image = models.ImageField(
+        upload_to="host_verification/business_docs/", blank=True, null=True
     )
 
-    # Admin review details
+    # Agreement
+    agreed_to_terms = models.BooleanField(default=False)
+
+    # Admin review
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     reviewed_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="reviewed_applications",
+        related_name="reviewed_host_applications",
     )
     review_notes = models.TextField(blank=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
-    # Timestamps
+    # Verification checklist
+    phone_verified_check = models.BooleanField(default=False)
+    identity_verified_check = models.BooleanField(default=False)
+    property_verified_check = models.BooleanField(default=False)
+    bank_verified_check = models.BooleanField(default=False)
+
     applied_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Host Application - {self.user.first_name} {self.user.last_name}"
+        return f"Host Application - {self.user.email}"
 
 
 # admin side ko lagi
@@ -397,9 +467,15 @@ class Booking(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     service_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    room_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
-    host_payout = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
-    superadmin_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    room_subtotal = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    host_payout = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    superadmin_revenue = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
 
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PENDING
