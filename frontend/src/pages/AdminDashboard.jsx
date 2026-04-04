@@ -159,10 +159,10 @@ const AdminDashboard = () => {
                 <main className="admin-main-content">
                     {activeTab === 'dashboard' && <DashboardOverview stats={stats} />}
                     {activeTab === 'users' && <UsersManagement />}
-                    {activeTab === 'host-applications' && <HostApplicationsManagement />}
-                    {activeTab === 'listings' && <ListingsManagement />}
-                    {activeTab === 'bookings' && <BookingsManagement />}
-                    {activeTab === 'reviews' && <ReviewsManagement />}
+                    {activeTab === 'host-applications' && <HostApplicationsManagement onActionComplete={fetchDashboardStats} />}
+                    {activeTab === 'listings' && <ListingsManagement onActionComplete={fetchDashboardStats} />}
+                    {activeTab === 'bookings' && <BookingsManagement onActionComplete={fetchDashboardStats} />}
+                    {activeTab === 'reviews' && <ReviewsManagement onActionComplete={fetchDashboardStats} />}
                     {activeTab === 'settings' && user?.is_superuser && <PlatformSettingsManagement />}
                 </main>
             </div>

@@ -68,6 +68,22 @@
   gap: 14px;
 }
 
+.no-search-prompt {
+  padding: 40px 20px;
+  text-align: center;
+  color: #717171;
+  background: #f8f8f8;
+  border-radius: 16px;
+  border: 1px dashed #ddd;
+  margin-top: 10px;
+}
+
+.no-search-prompt p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .listing-card-map {
   display: flex;
   gap: 12px;

@@ -1,343 +1,755 @@
-import React, { useState, useEffect } from 'react';
-import '../styles/HostApplicationModal.css';
+import React, { useEffect, useMemo, useState } from "react";
+
+import "../styles/HostApplicationModal.css"
+
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 const KNOWN_BANKS = [
-        'Nabil Bank',
-        'Global IME Bank',
-        'Nepal Investment Bank',
-        'NIC Asia Bank',
-         'Rastriya Banijya Bank',
-        'Nepal Bank'
-       ];
+  "Nabil Bank",
+  "Global IME Bank",
+  "Nepal Investment Mega Bank",
+  "NIC Asia Bank",
+  "Rastriya Banijya Bank",
+  "Nepal Bank Limited",
+];
 
-const HostApplicationModal = ({ isOpen, onClose }) => {
-    const [formData, setFormData] = useState({
-        citizenship_number: '',
-        citizenship_image: null,
-        phone_number: '',
-        business_name: '',
-        business_registration: '',
-        tax_number: '',
-        bank_name: '',
-        account_number: '',
-        account_holder_name: ''
+const initialFormData = {
+  citizenship_number: "",
+  citizenship_front_image: null,
+  selfie_with_id: null,
+  permanent_address: "",
+  property_address: "",
+  ownership_document: null,
+  bank_name: "",
+  account_number: "",
+  account_holder_name: "",
+  business_name: "",
+  pan_card_image: null,
+  agreed_to_terms: false,
+};
+
+const HostApplicationModal = ({ isOpen, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState(initialFormData);
+  const [existingApplication, setExistingApplication] = useState(null);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isOtherBankSelected, setIsOtherBankSelected] = useState(false);
+
+  const token = localStorage.getItem("access");
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEsc = (event) => {
+      if (event.key === "Escape") handleClose();
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+
+    fetchMyApplication();
+
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  const hasPanImage = useMemo(() => {
+    return !!formData.pan_card_image || !!existingApplication?.pan_card_image;
+  }, [formData.pan_card_image, existingApplication]);
+
+  const isEditMode = useMemo(() => {
+    return !!existingApplication;
+  }, [existingApplication]);
+
+  const getFileUrl = (value) => {
+    if (!value) return null;
+    if (value.startsWith("http://") || value.startsWith("https://")) return value;
+    return `${API_BASE_URL}${value}`;
+  };
+
+  const resetState = () => {
+    setFormData(initialFormData);
+    setExistingApplication(null);
+    setErrors({});
+    setServerError("");
+    setSuccessMessage("");
+    setIsOtherBankSelected(false);
+  };
+
+  const handleClose = () => {
+    if (loading) return;
+    resetState();
+    onClose();
+  };
+
+  const clearFieldError = (name) => {
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+    if (serverError) {
+      setServerError("");
+    }
+  };
+
+  const fillFormFromApplication = (application) => {
+    const bankName = application?.bank_name || "";
+    const knownBank = KNOWN_BANKS.includes(bankName);
+
+    setFormData((prev) => ({
+      ...prev,
+      citizenship_number: application?.citizenship_number || "",
+      permanent_address: application?.permanent_address || "",
+      property_address: application?.property_address || "",
+      bank_name: bankName,
+      account_number: application?.account_number || "",
+      account_holder_name: application?.account_holder_name || "",
+      business_name: application?.business_name || "",
+      agreed_to_terms: !!application?.agreed_to_terms,
+      citizenship_front_image: null,
+      selfie_with_id: null,
+      ownership_document: null,
+      pan_card_image: null,
+    }));
+
+    setIsOtherBankSelected(!!bankName && !knownBank);
+  };
+
+  const fetchMyApplication = async () => {
+    if (!token) return;
+
+    setLoadingExisting(true);
+    setServerError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/host-applications/me/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 404) {
+        setExistingApplication(null);
+        setFormData(initialFormData);
+        setIsOtherBankSelected(false);
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to load your host application.");
+      }
+
+      setExistingApplication(data);
+      fillFormFromApplication(data);
+    } catch (error) {
+      setServerError(error.message || "Failed to load your host application.");
+    } finally {
+      setLoadingExisting(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+
+    clearFieldError(name);
+  };
+
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    const file = files && files[0] ? files[0] : null;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: file,
+    }));
+
+    clearFieldError(name);
+  };
+
+  const handleBankSelectChange = (e) => {
+    const selectedValue = e.target.value;
+
+    if (selectedValue === "Others") {
+      setIsOtherBankSelected(true);
+      setFormData((prev) => ({
+        ...prev,
+        bank_name: "",
+      }));
+    } else {
+      setIsOtherBankSelected(false);
+      setFormData((prev) => ({
+        ...prev,
+        bank_name: selectedValue,
+      }));
+    }
+
+    clearFieldError("bank_name");
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.citizenship_number.trim()) {
+      newErrors.citizenship_number = "Citizenship number is required.";
+    }
+
+    if (!formData.permanent_address.trim()) {
+      newErrors.permanent_address = "Permanent address is required.";
+    }
+
+    if (!formData.property_address.trim()) {
+      newErrors.property_address = "Property address is required.";
+    }
+
+    if (!formData.bank_name.trim()) {
+      newErrors.bank_name = "Bank name is required.";
+    }
+
+    if (!formData.account_number.trim()) {
+      newErrors.account_number = "Account number is required.";
+    }
+
+    if (!formData.account_holder_name.trim()) {
+      newErrors.account_holder_name = "Account holder name is required.";
+    }
+
+    if (!formData.agreed_to_terms) {
+      newErrors.agreed_to_terms = "You must agree to the terms and conditions.";
+    }
+
+    if (formData.pan_card_image && !formData.business_name.trim()) {
+      newErrors.business_name = "Business name is required if PAN card image is uploaded.";
+    }
+
+    // Required only for first submit
+    if (!isEditMode) {
+      if (!formData.citizenship_front_image) {
+        newErrors.citizenship_front_image = "Citizenship front image is required.";
+      }
+
+      if (!formData.selfie_with_id) {
+        newErrors.selfie_with_id = "Selfie with ID is required.";
+      }
+
+      if (!formData.ownership_document) {
+        newErrors.ownership_document = "Ownership document is required.";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const buildFormData = () => {
+    const data = new FormData();
+
+    data.append("citizenship_number", formData.citizenship_number.trim());
+    data.append("permanent_address", formData.permanent_address.trim());
+    data.append("property_address", formData.property_address.trim());
+    data.append("bank_name", formData.bank_name.trim());
+    data.append("account_number", formData.account_number.trim());
+    data.append("account_holder_name", formData.account_holder_name.trim());
+    data.append("agreed_to_terms", String(formData.agreed_to_terms));
+
+    if (formData.business_name.trim()) {
+      data.append("business_name", formData.business_name.trim());
+    }
+
+    if (formData.citizenship_front_image) {
+      data.append("citizenship_front_image", formData.citizenship_front_image);
+    }
+
+    if (formData.selfie_with_id) {
+      data.append("selfie_with_id", formData.selfie_with_id);
+    }
+
+    if (formData.ownership_document) {
+      data.append("ownership_document", formData.ownership_document);
+    }
+
+    if (formData.pan_card_image) {
+      data.append("pan_card_image", formData.pan_card_image);
+    }
+
+    return data;
+  };
+
+  const parseBackendErrors = async (response) => {
+    try {
+      return await response.json();
+    } catch {
+      return { detail: "Something went wrong. Please try again." };
+    }
+  };
+
+  const normalizeBackendErrors = (data) => {
+    const formatted = {};
+
+    if (data.detail) {
+      formatted.detail = Array.isArray(data.detail) ? data.detail[0] : data.detail;
+    }
+
+    Object.keys(data).forEach((key) => {
+      if (key === "detail") return;
+
+      const value = data[key];
+
+      if (Array.isArray(value)) {
+        formatted[key] = value[0];
+      } else if (typeof value === "string") {
+        formatted[key] = value;
+      } else if (value && typeof value === "object") {
+        const firstNestedKey = Object.keys(value)[0];
+        if (firstNestedKey) {
+          const nestedValue = value[firstNestedKey];
+          formatted[key] = Array.isArray(nestedValue) ? nestedValue[0] : nestedValue;
+        }
+      }
     });
-    const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState({});
-    const [success, setSuccess] = useState(false);
 
-    // ✅ ADDED: Track whether user selected "Others" from dropdown
-    // This is separate from bank_name so we don't lose the "Others" state
-    // when bank_name becomes empty string while user is typing
-    const [isOtherBankSelected, setIsOtherBankSelected] = useState(false);
+    return formatted;
+  };
 
-    // Close on Escape key
-    useEffect(() => {
-        const handleEsc = (event) => {
-            if (event.keyCode === 27) onClose();
-        };
-        if (isOpen) {
-            window.addEventListener('keydown', handleEsc);
-            document.body.style.overflow = 'hidden';
-        }
-        return () => {
-            window.removeEventListener('keydown', handleEsc);
-            document.body.style.overflow = 'unset';
-        };
-    }, [isOpen, onClose]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    if (!isOpen) return null;
+    if (!validateForm()) return;
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
-        }
-    };
+    if (!token) {
+      setServerError("You are not logged in. Please login first.");
+      return;
+    }
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setFormData(prev => ({ ...prev, citizenship_image: file }));
-        if (errors.citizenship_image) {
-            setErrors(prev => ({ ...prev, citizenship_image: '' }));
-        }
-    };
+    setLoading(true);
+    setErrors({});
+    setServerError("");
+    setSuccessMessage("");
 
-    const validateForm = () => {
-        const newErrors = {};
-        if (!formData.citizenship_number.trim()) newErrors.citizenship_number = 'Citizenship number is required';
-        if (!formData.citizenship_image) newErrors.citizenship_image = 'Citizenship copy is required';
-        if (!formData.phone_number.trim()) newErrors.phone_number = 'Phone number is required';
-        if (!formData.bank_name.trim()) newErrors.bank_name = 'Bank name is required';
-        if (!formData.account_number.trim()) newErrors.account_number = 'Account number is required';
-        if (!formData.account_holder_name.trim()) newErrors.account_holder_name = 'Account holder name is required';
+    try {
+      const payload = buildFormData();
 
-        if (formData.phone_number && !/^\d{10}$/.test(formData.phone_number)) {
-            newErrors.phone_number = 'Please enter a valid 10-digit phone number';
+      const response = await fetch(`${API_BASE_URL}/api/host-applications/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload,
+      });
+
+      const responseData = await parseBackendErrors(response);
+
+      if (!response.ok) {
+        const normalized = normalizeBackendErrors(responseData);
+
+        if (normalized.detail) {
+          setServerError(normalized.detail);
         }
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+        const fieldErrors = { ...normalized };
+        delete fieldErrors.detail;
+        setErrors(fieldErrors);
+        return;
+      }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!validateForm()) return;
+      setSuccessMessage(
+        isEditMode
+          ? "Host application updated and resubmitted successfully."
+          : "Host application submitted successfully."
+      );
 
-        setLoading(true);
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
         try {
-            const token = localStorage.getItem('access');
-
-            if (!token) {
-                alert('You are not logged in. Please login first.');
-                return;
-            }
-
-            const data = new FormData();
-            Object.keys(formData).forEach(key => {
-                if (formData[key]) data.append(key, formData[key]);
-            });
-
-            const response = await fetch('http://127.0.0.1:8000/api/host-applications/', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: data
-            });
-
-            if (response.ok) {
-                setSuccess(true);
-
-                const storedUser = localStorage.getItem('user');
-                if (storedUser) {
-                    try {
-                        const userObj = JSON.parse(storedUser);
-                        userObj.host_application_status = 'pending';
-                        localStorage.setItem('user', JSON.stringify(userObj));
-                    } catch (e) {
-                        console.error('Error updating local user state:', e);
-                    }
-                }
-
-                setTimeout(() => {
-                    onClose();
-                    setSuccess(false);
-                    window.location.reload();
-                }, 3000);
-            } else {
-                const errData = await response.json().catch(() => ({}));
-                console.error('Submission error:', errData);
-                alert(`Error submitting application: ${errData.detail || 'Please try again.'}`);
-            }
-        } catch (error) {
-            console.error('Network error:', error);
-            alert('Could not connect to server. Please check if backend is running.');
-        } finally {
-            setLoading(false);
+          const parsedUser = JSON.parse(storedUser);
+          parsedUser.host_application_status = "pending";
+          localStorage.setItem("user", JSON.stringify(parsedUser));
+        } catch {
+          // ignore localStorage parse issue
         }
-    };
+      }
 
-    // ✅ ADDED: Handle bank dropdown change separately
-    // - If user picks a known bank → save it directly, hide text input
-    // - If user picks "Others" → clear bank_name, show text input
-    // - If user goes back to "Select Bank" → clear everything, hide text input
-    const handleBankSelectChange = (e) => {
-        const value = e.target.value;
-
-        if (value === 'Others') {
-            // User selected Others: show text input, clear bank_name so they can type
-            setIsOtherBankSelected(true);
-            setFormData(prev => ({ ...prev, bank_name: '' }));
-        } else {
-            // User picked a known bank or the blank option: hide text input, save value
-            setIsOtherBankSelected(false);
-            setFormData(prev => ({ ...prev, bank_name: value }));
+      setTimeout(() => {
+        handleClose();
+        if (onSuccess) {
+          onSuccess();
         }
+      }, 1500);
+    } catch (error) {
+      setServerError("Could not connect to server. Please check if backend is running.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // Clear any bank error when user interacts
-        if (errors.bank_name) {
-            setErrors(prev => ({ ...prev, bank_name: '' }));
-        }
-    };
+  if (!isOpen) return null;
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>✕</button>
+  return (
+    <div
+      className="modal-overlay"
+      onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="host-application-title"
+    >
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="modal-close"
+          onClick={handleClose}
+          disabled={loading}
+        >
+          ✕
+        </button>
 
-                {success ? (
-                    <div className="success-message">
-                        <div className="success-icon">✓</div>
-                        <h2>Congratulations!</h2>
-                        <p>Your application has been received successfully. We will contact you soon.</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="modal-header">
-                            <h2>Become a Host</h2>
-                            <p>Share your space and start earning</p>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="host-form">
-                            <div className="form-grid">
-                                <div className="section-title">Personal Details</div>
-
-                                <div className="form-group">
-                                    <label>Citizenship Number</label>
-                                    <input
-                                        type="text"
-                                        name="citizenship_number"
-                                        placeholder="Enter citizenship number"
-                                        value={formData.citizenship_number}
-                                        onChange={handleInputChange}
-                                        className={errors.citizenship_number ? 'error' : ''}
-                                    />
-                                    {errors.citizenship_number && <span className="error-text">Required</span>}
-                                </div>
-
-                                <div className="form-group text-center">
-                                    <label>Citizenship Photo</label>
-                                    <div className="file-input-wrapper">
-                                        <input
-                                            type="file"
-                                            id="citizenship_image"
-                                            onChange={handleFileChange}
-                                            accept="image/*"
-                                        />
-                                        <label htmlFor="citizenship_image" className="file-label">
-                                            {formData.citizenship_image ? formData.citizenship_image.name : 'Upload Photo'}
-                                        </label>
-                                    </div>
-                                    {errors.citizenship_image && <span className="error-text">Required</span>}
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label>Phone Number</label>
-                                    <input
-                                        type="tel"
-                                        name="phone_number"
-                                        placeholder="Enter phone number"
-                                        value={formData.phone_number}
-                                        onChange={handleInputChange}
-                                        className={errors.phone_number ? 'error' : ''}
-                                        maxLength="10"
-                                    />
-                                    {errors.phone_number && <span className="error-text">{errors.phone_number}</span>}
-                                </div>
-
-                                <div className="section-title">Bank Details</div>
-
-                                <div className="form-group">
-                                    <label>Bank Name</label>
-
-                                    {/* ✅ ADDED: Dropdown shows "Others" as selected when isOtherBankSelected is true */}
-                                    <select
-                                        name="bank_name"
-                                        value={isOtherBankSelected ? 'Others' : formData.bank_name}
-                                        onChange={handleBankSelectChange}
-                                        className={errors.bank_name && !isOtherBankSelected ? 'error' : ''}
-                                    >
-                                        <option value="">Select Bank</option>
-                                        <option value="Nabil Bank">Nabil Bank</option>
-                                        <option value="Global IME Bank">Global IME Bank</option>
-                                        <option value="Nepal Investment Bank">Nepal Investment Mega Bank</option>
-                                        <option value="NIC Asia Bank">NIC Asia Bank</option>
-                                        <option value="Rastriya Banijya Bank">Rastriya Banijya Bank</option>
-                                        <option value="Nepal Bank">Nepal Bank Limited</option>
-                                        <option value="Others">Others</option>
-                                    </select>
-
-                                    {/* ✅ ADDED: Only show text input when isOtherBankSelected is true
-                                        This is now reliable because it uses dedicated state, not bank_name value */}
-                                    {isOtherBankSelected && (
-                                        <input
-                                            type="text"
-                                            name="bank_name"
-                                            placeholder="Enter your bank name"
-                                            value={formData.bank_name}
-                                            onChange={handleInputChange}
-                                            className={errors.bank_name ? 'error' : ''}
-                                            autoFocus
-                                        />
-                                    )}
-
-                                    {errors.bank_name && <span className="error-text">Required</span>}
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Account Number</label>
-                                    <input
-                                        type="text"
-                                        name="account_number"
-                                        placeholder="Bank account number"
-                                        value={formData.account_number}
-                                        onChange={handleInputChange}
-                                        className={errors.account_number ? 'error' : ''}
-                                    />
-                                    {errors.account_number && <span className="error-text">Required</span>}
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label>Account Holder Name</label>
-                                    <input
-                                        type="text"
-                                        name="account_holder_name"
-                                        placeholder="Name as in bank account"
-                                        value={formData.account_holder_name}
-                                        onChange={handleInputChange}
-                                        className={errors.account_holder_name ? 'error' : ''}
-                                    />
-                                    {errors.account_holder_name && <span className="error-text">Required</span>}
-                                </div>
-
-                                <div className="section-title">Business Details (Optional)</div>
-
-                                <div className="form-group">
-                                    <label>Business Name <span style={{ color: '#9ca3af', fontWeight: '400' }}>(Optional)</span></label>
-                                    <input
-                                        type="text"
-                                        name="business_name"
-                                        placeholder="Your business name"
-                                        value={formData.business_name}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>PAN/VAT No. <span style={{ color: '#9ca3af', fontWeight: '400' }}>(Optional)</span></label>
-                                    <input
-                                        type="text"
-                                        name="tax_number"
-                                        placeholder="PAN or VAT Number"
-                                        value={formData.tax_number}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label>Reg. Number <span style={{ color: '#9ca3af', fontWeight:  '400' }}>(Optional)</span></label>
-                                    <input
-                                        type="text"
-                                        name="business_registration"
-                                        placeholder="Registration Number"
-                                        value={formData.business_registration}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-footer">
-                                <p className="terms">By submitting, you agree to our <a href="#">Terms & Conditions</a>.</p>
-                                <button type="submit" className="submit-btn" disabled={loading}>
-                                    {loading ? 'Processing...' : 'Submit Application'}
-                                </button>
-                            </div>
-                        </form>
-                    </>
-                )}
-            </div>
+        <div className="modal-header">
+          <h2 id="host-application-title">
+            {isEditMode ? "Edit Host Application" : "Apply to Become a Host"}
+          </h2>
+          <p>
+            {isEditMode
+              ? "Update your application and resubmit it for review."
+              : "Submit your owner verification details to start listing your property."}
+          </p>
         </div>
-    );
+
+        {loadingExisting ? (
+          <div className="loading-state">
+            <p>Loading application...</p>
+          </div>
+        ) : successMessage ? (
+          <div className="success-message">
+            <h3>Success</h3>
+            <p>{successMessage}</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="host-form">
+            {serverError ? (
+              <div className="error-box">
+                <p>{serverError}</p>
+              </div>
+            ) : null}
+
+            {isEditMode && existingApplication?.status === "needs_more_info" ? (
+              <div className="info-box">
+                <p>
+                  Your previous application needs more information. Update the required
+                  details and submit again.
+                </p>
+                {existingApplication.review_notes ? (
+                  <p>
+                    <strong>Admin notes:</strong> {existingApplication.review_notes}
+                  </p>
+                ) : null}
+
+                <div className="verification-checks-grid">
+                  <div className={`check-item ${existingApplication.phone_verified_check ? 'passed' : 'pending'}`}>
+                    <i className={`bi ${existingApplication.phone_verified_check ? 'bi-check-circle-fill' : 'bi-info-circle'}`}></i>
+                    <span>Phone Verification: {existingApplication.phone_verified_check ? 'Passed' : 'Needs Review'}</span>
+                  </div>
+                  <div className={`check-item ${existingApplication.identity_verified_check ? 'passed' : 'pending'}`}>
+                    <i className={`bi ${existingApplication.identity_verified_check ? 'bi-check-circle-fill' : 'bi-info-circle'}`}></i>
+                    <span>Identity Verification: {existingApplication.identity_verified_check ? 'Passed' : 'Needs Review'}</span>
+                  </div>
+                  <div className={`check-item ${existingApplication.property_verified_check ? 'passed' : 'pending'}`}>
+                    <i className={`bi ${existingApplication.property_verified_check ? 'bi-check-circle-fill' : 'bi-info-circle'}`}></i>
+                    <span>Property Verification: {existingApplication.property_verified_check ? 'Passed' : 'Needs Review'}</span>
+                  </div>
+                  <div className={`check-item ${existingApplication.bank_verified_check ? 'passed' : 'pending'}`}>
+                    <i className={`bi ${existingApplication.bank_verified_check ? 'bi-check-circle-fill' : 'bi-info-circle'}`}></i>
+                    <span>Bank Verification: {existingApplication.bank_verified_check ? 'Passed' : 'Needs Review'}</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="form-grid">
+              <div className="section-title">Identity Details</div>
+
+              <div className="form-group">
+                <label htmlFor="citizenship_number">Citizenship Number</label>
+                <input
+                  id="citizenship_number"
+                  type="text"
+                  name="citizenship_number"
+                  value={formData.citizenship_number}
+                  onChange={handleInputChange}
+                  placeholder="Enter citizenship number"
+                />
+                {errors.citizenship_number && (
+                  <span className="error-text">{errors.citizenship_number}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="citizenship_front_image">Citizenship Front Image</label>
+                <input
+                  id="citizenship_front_image"
+                  type="file"
+                  name="citizenship_front_image"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {formData.citizenship_front_image ? (
+                  <small>{formData.citizenship_front_image.name}</small>
+                ) : existingApplication?.citizenship_front_image ? (
+                  <small>
+                    Existing file:{" "}
+                    <a
+                      href={getFileUrl(existingApplication.citizenship_front_image)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View current file
+                    </a>
+                  </small>
+                ) : null}
+                {errors.citizenship_front_image && (
+                  <span className="error-text">{errors.citizenship_front_image}</span>
+                )}
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="selfie_with_id">Selfie With ID</label>
+                <input
+                  id="selfie_with_id"
+                  type="file"
+                  name="selfie_with_id"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {formData.selfie_with_id ? (
+                  <small>{formData.selfie_with_id.name}</small>
+                ) : existingApplication?.selfie_with_id ? (
+                  <small>
+                    Existing file:{" "}
+                    <a
+                      href={getFileUrl(existingApplication.selfie_with_id)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View current file
+                    </a>
+                  </small>
+                ) : null}
+                {errors.selfie_with_id && (
+                  <span className="error-text">{errors.selfie_with_id}</span>
+                )}
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="permanent_address">Permanent Address</label>
+                <textarea
+                  id="permanent_address"
+                  name="permanent_address"
+                  rows="3"
+                  value={formData.permanent_address}
+                  onChange={handleInputChange}
+                  placeholder="Enter your permanent address"
+                />
+                {errors.permanent_address && (
+                  <span className="error-text">{errors.permanent_address}</span>
+                )}
+              </div>
+
+              <div className="section-title">Property Ownership</div>
+
+              <div className="form-group full-width">
+                <label htmlFor="property_address">Property Address</label>
+                <textarea
+                  id="property_address"
+                  name="property_address"
+                  rows="3"
+                  value={formData.property_address}
+                  onChange={handleInputChange}
+                  placeholder="Enter the full property address"
+                />
+                {errors.property_address && (
+                  <span className="error-text">{errors.property_address}</span>
+                )}
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="ownership_document">Ownership Document</label>
+                <input
+                  id="ownership_document"
+                  type="file"
+                  name="ownership_document"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={handleFileChange}
+                />
+                {formData.ownership_document ? (
+                  <small>{formData.ownership_document.name}</small>
+                ) : existingApplication?.ownership_document ? (
+                  <small>
+                    Existing file:{" "}
+                    <a
+                      href={getFileUrl(existingApplication.ownership_document)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View current file
+                    </a>
+                  </small>
+                ) : null}
+                {errors.ownership_document && (
+                  <span className="error-text">{errors.ownership_document}</span>
+                )}
+              </div>
+
+              <div className="section-title">Bank Information</div>
+
+              <div className="form-group">
+                <label htmlFor="bank_name_select">Bank Name</label>
+                <select
+                  id="bank_name_select"
+                  value={isOtherBankSelected ? "Others" : formData.bank_name}
+                  onChange={handleBankSelectChange}
+                >
+                  <option value="">Select bank</option>
+                  {KNOWN_BANKS.map((bank) => (
+                    <option key={bank} value={bank}>
+                      {bank}
+                    </option>
+                  ))}
+                  <option value="Others">Others</option>
+                </select>
+
+                {isOtherBankSelected && (
+                  <input
+                    type="text"
+                    name="bank_name"
+                    value={formData.bank_name}
+                    onChange={handleInputChange}
+                    placeholder="Enter your bank name"
+                  />
+                )}
+
+                {errors.bank_name && (
+                  <span className="error-text">{errors.bank_name}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="account_number">Account Number</label>
+                <input
+                  id="account_number"
+                  type="text"
+                  name="account_number"
+                  value={formData.account_number}
+                  onChange={handleInputChange}
+                  placeholder="Enter bank account number"
+                />
+                {errors.account_number && (
+                  <span className="error-text">{errors.account_number}</span>
+                )}
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="account_holder_name">Account Holder Name</label>
+                <input
+                  id="account_holder_name"
+                  type="text"
+                  name="account_holder_name"
+                  value={formData.account_holder_name}
+                  onChange={handleInputChange}
+                  placeholder="Enter account holder name"
+                />
+                {errors.account_holder_name && (
+                  <span className="error-text">{errors.account_holder_name}</span>
+                )}
+              </div>
+
+              <div className="section-title">Optional Business Information</div>
+
+              <div className="form-group">
+                <label htmlFor="business_name">
+                  Business Name {hasPanImage ? "" : "(Optional)"}
+                </label>
+                <input
+                  id="business_name"
+                  type="text"
+                  name="business_name"
+                  value={formData.business_name}
+                  onChange={handleInputChange}
+                  placeholder="Enter business name"
+                />
+                {errors.business_name && (
+                  <span className="error-text">{errors.business_name}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="pan_card_image">PAN Card Image (Optional)</label>
+                <input
+                  id="pan_card_image"
+                  type="file"
+                  name="pan_card_image"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {formData.pan_card_image ? (
+                  <small>{formData.pan_card_image.name}</small>
+                ) : existingApplication?.pan_card_image ? (
+                  <small>
+                    Existing file:{" "}
+                    <a
+                      href={getFileUrl(existingApplication.pan_card_image)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View current file
+                    </a>
+                  </small>
+                ) : null}
+                {errors.pan_card_image && (
+                  <span className="error-text">{errors.pan_card_image}</span>
+                )}
+              </div>
+
+              <div className="form-group full-width">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="agreed_to_terms"
+                    checked={formData.agreed_to_terms}
+                    onChange={handleInputChange}
+                  />{" "}
+                  I agree to the terms and conditions.
+                </label>
+                {errors.agreed_to_terms && (
+                  <span className="error-text">{errors.agreed_to_terms}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="form-footer">
+              <button type="button" onClick={handleClose} disabled={loading}>
+                Cancel
+              </button>
+              <button type="submit" disabled={loading}>
+                {loading
+                  ? "Submitting..."
+                  : isEditMode
+                  ? "Update & Resubmit"
+                  : "Submit Application"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default HostApplicationModal;

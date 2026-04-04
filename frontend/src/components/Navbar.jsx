@@ -167,6 +167,22 @@ function Navbar({ searchTerm, setSearchTerm }) {
             >
               Pending Review
             </button>
+          ) : user?.host_application_status === "needs_more_info" ? (
+            <button
+              className="nav__hostBtn nav__hostBtn--warning"
+              type="button"
+              onClick={handleBecomeHost}
+            >
+              Action Required
+            </button>
+          ) : user?.host_application_status === "rejected" ? (
+            <button
+              className="nav__hostBtn nav__hostBtn--danger"
+              type="button"
+              onClick={handleBecomeHost}
+            >
+              Re-apply
+            </button>
           ) : (
             <button
               className="nav__hostBtn"

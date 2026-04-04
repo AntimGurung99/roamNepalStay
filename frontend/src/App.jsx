@@ -86,6 +86,9 @@ function App() {
           "/my-bookings",
           "/host/dashboard",
           "/wishlist",
+          "/my-properties",
+          "/explore-map",
+
         ].includes(location.pathname) &&
         !location.pathname.startsWith("/checkout") && <Footer />}
     </>

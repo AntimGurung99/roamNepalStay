@@ -89,6 +89,7 @@
 //     search: "",
 //     city: "",
 //     min_price: "",
+
 //     max_price: "",
 //   });
 
@@ -266,12 +267,13 @@
 // export default ExploreMapPage;
 
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
+  useMap,
   useMapEvents,
 } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -348,6 +350,18 @@ function MapBoundsListener({ onBoundsChange }) {
   return null;
 }
 
+function MapInvalidator() {
+  const map = useMap();
+  useEffect(() => {
+    // Small delay to ensure the container has reached its final size
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+}
+
 const ExploreMapPage = () => {
   const navigate = useNavigate();
   const mapRef = useRef(null);
@@ -357,22 +371,22 @@ const ExploreMapPage = () => {
   const [mapBounds, setMapBounds] = useState(null);
 
   const [filters, setFilters] = useState({
-    district: "",
-    min_price: "",
-    max_price: "",
+      search: "",
+      min_price: "",
+      max_price: "",
   });
 
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async (fitNewBounds = false, overrideFilters = null) => {
+    setLoading(true);
     try {
-      setLoading(true);
-
+      const activeFilters = overrideFilters || filters;
       const params = {};
 
-      if (filters.district) params.district = filters.district;
-      if (filters.min_price) params.min_price = filters.min_price;
-      if (filters.max_price) params.max_price = filters.max_price;
+      if (activeFilters.search?.trim()) params.search = activeFilters.search.trim();
+      if (activeFilters.min_price) params.min_price = activeFilters.min_price;
+      if (activeFilters.max_price) params.max_price = activeFilters.max_price;
 
-      if (mapBounds) {
+      if (mapBounds && !fitNewBounds) {
         params.north = mapBounds.north;
         params.south = mapBounds.south;
         params.east = mapBounds.east;
@@ -380,26 +394,47 @@ const ExploreMapPage = () => {
       }
 
       const response = await listingsAPI.getMapListings(params);
-      setListings(Array.isArray(response.data) ? response.data : []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      setListings(data);
+
+      if (fitNewBounds && data.length > 0 && mapRef.current) {
+        const points = data
+          .filter((l) => l.latitude && l.longitude)
+          .map((l) => [Number(l.latitude), Number(l.longitude)]);
+
+        if (points.length > 0) {
+          mapRef.current.fitBounds(points, { padding: [50, 50] });
+        }
+      }
     } catch (error) {
       console.error("Error fetching map listings:", error);
       setListings([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, mapBounds]);
 
   useEffect(() => {
-    fetchListings();
-  }, [mapBounds]);
+    fetchListings(false);
+  }, [mapBounds, fetchListings]);
+
+  const isFilterActive = useMemo(() => {
+    return (
+      filters.search.trim() !== "" ||
+      filters.min_price !== "" ||
+      filters.max_price !== ""
+    );
+  }, [filters]);
 
   const validListings = useMemo(() => {
+    if (!isFilterActive) return [];
+
     return listings.filter((listing) => {
       const lat = Number(listing.latitude);
       const lng = Number(listing.longitude);
       return Number.isFinite(lat) && Number.isFinite(lng);
     });
-  }, [listings]);
+  }, [listings, isFilterActive]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -410,15 +445,18 @@ const ExploreMapPage = () => {
   };
 
   const applyFilters = () => {
-    fetchListings();
+    fetchListings(true);
   };
 
   const clearFilters = () => {
-    setFilters({
-      district: "",
+    const freshFilters = {
+      search: "",
       min_price: "",
       max_price: "",
-    });
+    };
+    setFilters(freshFilters);
+    // Trigger immediate fetch with cleared filters
+    fetchListings(false, freshFilters);
   };
 
   const flyToListing = (listing) => {
@@ -449,11 +487,11 @@ const ExploreMapPage = () => {
           </h2>
 
           <input
-            type="text"
-            name="district"
-            placeholder="Search district"
-            value={filters.district}
-            onChange={handleFilterChange}
+              type="text"
+              name="search"
+              placeholder="Search by title, city, district, province, or region"
+              value={filters.search}
+              onChange={handleFilterChange}
           />
 
           <input
@@ -488,10 +526,25 @@ const ExploreMapPage = () => {
         </div>
 
         <div className="results-header">
-          {loading ? "Loading..." : `${validListings.length} stays found`}
+          {loading ? (
+            "Loading..."
+          ) : !isFilterActive ? (
+            "Search to find properties"
+          ) : (
+            `${validListings.length} stays found`
+          )}
         </div>
 
         <div className="listing-results">
+          {validListings.length === 0 && !loading && (
+            <div className="no-search-prompt">
+              {!isFilterActive ? (
+                <p>Use the search bar above or apply a price filter to explore available stays.</p>
+              ) : (
+                <p>No matches found for your current search criteria.</p>
+              )}
+            </div>
+          )}
           {validListings.map((listing) => (
             <div
               key={listing.id}
@@ -523,15 +576,14 @@ const ExploreMapPage = () => {
           center={[27.7172, 85.324]}
           zoom={12}
           className="leaflet-map"
-          whenCreated={(mapInstance) => {
-            mapRef.current = mapInstance;
-          }}
+          ref={mapRef}
         >
           <TileLayer
             attribution='&copy; OpenStreetMap contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
+          <MapInvalidator />
           <MapBoundsListener onBoundsChange={setMapBounds} />
 
           <MarkerClusterGroup chunkedLoading>

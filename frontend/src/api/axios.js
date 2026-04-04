@@ -57,4 +57,8 @@ export const platformSettingsAPI = {
   getPublicFee: () => API.get("/public/platform-fee/"),
 };
 
+export const aiAPI = {
+  homeChat: (message) => API.post("/ai/home-chat/", { message }),
+};
+
 export default API;

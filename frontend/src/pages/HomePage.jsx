@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import TopPage from '../components/TopPage';
 import CategoriesPage from '../components/CategoriesPage';
 import ListingsGrid from '../components/ListingsGrid';
+import HomeAIChat from "../components/HomeAIChat";
 
 const HomePage = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +14,7 @@ const HomePage = () => {
       <TopPage />
       <CategoriesPage />
       <ListingsGrid searchTerm={searchTerm} />
+      <HomeAIChat />
     </div>
   );
 };

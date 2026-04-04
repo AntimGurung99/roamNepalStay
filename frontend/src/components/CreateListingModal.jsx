@@ -763,6 +763,17 @@ function MapRecenter({ latitude, longitude }) {
   return null;
 }
 
+function MapInvalidator() {
+  const map = useMap();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 250); // Slightly longer delay for modal transitions
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+}
+
 function LocationMapPicker({ latitude, longitude, onChange }) {
   function MapClickHandler() {
     useMapEvents({
@@ -796,6 +807,7 @@ function LocationMapPicker({ latitude, longitude, onChange }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapInvalidator />
         <MapClickHandler />
         <MapRecenter latitude={latitude} longitude={longitude} />
 
