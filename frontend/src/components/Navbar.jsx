@@ -7,28 +7,16 @@ import HostApplicationModal from "./HostApplicationModal";
 import CreateListingModal from "./CreateListingModal";
 import ProfileIcon from "../pages/ProfileIcon";
 import { RxHamburgerMenu } from "react-icons/rx";
+import NotificationBell from "./NotificationBell";
 
 function Navbar({ searchTerm, setSearchTerm }) {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [isHostModalOpen, setIsHostModalOpen] = useState(false);
   const [isListingModalOpen, setIsListingModalOpen] = useState(false);
-  const [bookingCount, setBookingCount] = useState(0);
+
   const menuRef = useRef(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const res = await api.get("/host/bookings/");
-        setBookingCount(res.data.length);
-      } catch (err) {
-        console.log("Failed to fetch bookings");
-      }
-    };
-
-    fetchBookings();
-  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -37,7 +25,6 @@ function Navbar({ searchTerm, setSearchTerm }) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-
         refreshUserData();
       } catch (error) {
         console.error("User parse error:", error);
@@ -59,7 +46,6 @@ function Navbar({ searchTerm, setSearchTerm }) {
   const refreshUserData = async () => {
     try {
       const response = await api.get("/auth/profile/");
-
       const latestUser = response.data;
       localStorage.setItem("user", JSON.stringify(latestUser));
       setUser(latestUser);
@@ -140,15 +126,13 @@ function Navbar({ searchTerm, setSearchTerm }) {
 
         {/* RIGHT */}
         <div className="nav__right">
-
-          {/* ✅ ADD THIS (Explore Map Button) */}
-          {/* <Link to="/explore-map" className="nav__exploreMap">
-            Explore Map
-          </Link> */}
           <Link to="/explore-map" className="nav__exploreMap">
-          <i className="bi bi-geo-alt-fill" style={{ marginRight: "6px" }}></i>
-          Explore Map
-        </Link>
+            <i
+              className="bi bi-geo-alt-fill"
+              style={{ marginRight: "6px" }}
+            ></i>
+            Explore Map
+          </Link>
 
           {/* HOST BUTTON */}
           {user?.is_host ? (
@@ -191,6 +175,16 @@ function Navbar({ searchTerm, setSearchTerm }) {
             >
               Become A Host
             </button>
+          )}
+
+          {/* NOTIFICATION BELL */}
+          {/* {user && <NotificationBell />} */}
+          {user && (
+            <NotificationBell
+              scope="guest"
+              title="Guest Notifications"
+              viewAllPath="/notifications"
+            />
           )}
 
           {/* PROFILE ICON */}

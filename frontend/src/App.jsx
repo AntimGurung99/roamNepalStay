@@ -21,6 +21,7 @@ import ExploreMapPage from "./pages/ExploreMapPage";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import HostBookingDetails from "./pages/HostBookingDetails";
 
 function App() {
   const location = useLocation();
@@ -44,6 +45,7 @@ function App() {
 
 
         <Route path="/host/dashboard" element={<HostDashboard />} />
+        <Route path="/host/booking/:id" element={<HostBookingDetails />} />
 
         <Route path="/test" element={<TestPage />} />
 
@@ -65,6 +67,7 @@ function App() {
           element={<PaymentFailed />}
         />
         <Route path="/checkout/:listingId" element={<CheckoutPage />} />
+       
       </Routes>
 
       <ToastContainer

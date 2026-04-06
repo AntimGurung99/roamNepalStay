@@ -37,7 +37,7 @@ const HomeAIChat = () => {
     }
   };
 
-  // ✅ Navigate to explore page
+  //  Navigate to explore page
   const goToSuggestedPlace = () => {
     if (!suggestedPlace) return;
 

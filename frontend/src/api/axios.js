@@ -61,4 +61,12 @@ export const aiAPI = {
   homeChat: (message) => API.post("/ai/home-chat/", { message }),
 };
 
+export const notificationsAPI = {
+  getNotifications: (params = {}) => API.get("/notifications/", { params }),
+  markAsRead: (id) => API.post(`/notifications/${id}/read/`),
+  markAllAsRead: (params = {}) =>
+    API.post("/notifications/mark-all-read/", null, { params }),
+  deleteNotification: (id) => API.delete(`/notifications/${id}/`),
+};
+
 export default API;
