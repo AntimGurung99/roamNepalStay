@@ -4,7 +4,15 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 import re
-from .models import Listing, ListingImage, HostApplication, Booking, Review, Wishlist
+from .models import (
+    Listing,
+    ListingImage,
+    HostApplication,
+    Booking,
+    Review,
+    Wishlist,
+    Notification,
+)
 from django.utils import timezone
 from django.db.models import Avg
 from .models import PlatformSetting, Booking
@@ -1130,7 +1138,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
         overlapping = Booking.objects.filter(
             listing=listing,
-            status__in=["pending", "confirmed", "paid"],
+            status__in=["confirmed", "paid", "completed"],
             check_in__lt=check_out,
             check_out__gt=check_in,
         ).exists()
@@ -1342,3 +1350,28 @@ class ListingMapSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(primary_image.image.url)
             return primary_image.image.url
         return None
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "type",
+            "title",
+            "message",
+            "priority",
+            "is_read",
+            "read_at",
+            "data",
+            "actor_name",
+            "created_at",
+        ]
+
+    def get_actor_name(self, obj):
+        if not obj.actor:
+            return None
+        full_name = f"{obj.actor.first_name} {obj.actor.last_name}".strip()
+        return full_name or obj.actor.email

@@ -576,6 +576,100 @@ class Wishlist(models.Model):
         return f"{self.user.email} - {self.listing.title}"
 
 
+class Notification(models.Model):
+    class Type(models.TextChoices):
+        HOST_APPLICATION_SUBMITTED = (
+            "host_application_submitted",
+            "Host Application Submitted",
+        )
+        HOST_APPLICATION_APPROVED = (
+            "host_application_approved",
+            "Host Application Approved",
+        )
+        HOST_APPLICATION_REJECTED = (
+            "host_application_rejected",
+            "Host Application Rejected",
+        )
+        HOST_APPLICATION_NEEDS_INFO = (
+            "host_application_needs_info",
+            "Host Application Needs More Info",
+        )
+
+        LISTING_SUBMITTED = "listing_submitted", "Listing Submitted"
+        LISTING_APPROVED = "listing_approved", "Listing Approved"
+        LISTING_REJECTED = "listing_rejected", "Listing Rejected"
+        LISTING_SUSPENDED = "listing_suspended", "Listing Suspended"
+
+        BOOKING_CREATED = "booking_created", "Booking Created"
+        BOOKING_CONFIRMED = "booking_confirmed", "Booking Confirmed"
+        BOOKING_PAID = "booking_paid", "Booking Paid"
+        BOOKING_PAYMENT_FAILED = "booking_payment_failed", "Booking Payment Failed"
+        BOOKING_CANCELLED = "booking_cancelled", "Booking Cancelled"
+        CASH_IN_HAND_SELECTED = "cash_in_hand_selected", "Cash In Hand Selected"
+
+        REVIEW_RECEIVED = "review_received", "Review Received"
+
+        ADMIN_NEW_HOST_APPLICATION = (
+            "admin_new_host_application",
+            "Admin New Host Application",
+        )
+        ADMIN_HOST_APPLICATION_RESUBMITTED = (
+            "admin_host_application_resubmitted",
+            "Admin Host Application Resubmitted",
+        )
+        ADMIN_NEW_LISTING_PENDING = (
+            "admin_new_listing_pending",
+            "Admin New Listing Pending",
+        )
+        ADMIN_PAYMENT_FAILED = "admin_payment_failed", "Admin Payment Failed"
+
+    class Priority(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications_triggered",
+    )
+
+    type = models.CharField(max_length=60, choices=Type.choices)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    priority = models.CharField(
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+    )
+
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    data = models.JSONField(default=dict, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.recipient.email} - {self.title}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "-created_at"]),
+            models.Index(fields=["recipient", "is_read"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+
 class PlatformSetting(models.Model):
     site_name = models.CharField(max_length=100, default="RoamNepalStay")
     service_fee_percent = models.DecimalField(

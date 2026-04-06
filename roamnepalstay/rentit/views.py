@@ -46,6 +46,7 @@ from .models import (
     Review,
     Wishlist,
     PlatformSetting,
+    Notification,
 )
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -73,8 +74,16 @@ from .serializers import (
     PublicReviewSerializer,
     PlatformSettingSerializer,
     ListingMapSerializer,
+    NotificationSerializer,
 )
-from .utils import generate_otp, send_otp_email, send_booking_confirmation_emails
+from .utils import (
+    generate_otp,
+    send_otp_email,
+    send_booking_confirmation_emails,
+    create_notification,
+    notify_admins,
+    resolve_notification_scope,
+)
 
 User = get_user_model()
 
@@ -652,6 +661,20 @@ class AdminHostApplicationViewSet(GenericViewSet):
         user.host_application_status = "approved"
         user.save(update_fields=["is_host", "host_application_status"])
 
+        create_notification(
+            recipient=user,
+            type=Notification.Type.HOST_APPLICATION_APPROVED,
+            title="Host application approved",
+            message="Congratulations! Your host application has been approved. You can now add listings.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "application_id": application.id,
+                "url": "/profile",
+            },
+            expires_in_days=30,
+        )
+
         return Response({"detail": "Host application approved successfully."})
 
     @action(detail=True, methods=["post"])
@@ -674,6 +697,20 @@ class AdminHostApplicationViewSet(GenericViewSet):
         user.is_host = False
         user.host_application_status = "rejected"
         user.save(update_fields=["is_host", "host_application_status"])
+
+        create_notification(
+            recipient=user,
+            type=Notification.Type.HOST_APPLICATION_REJECTED,
+            title="Host application rejected",
+            message=application.review_notes or "Your host application was rejected.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "application_id": application.id,
+                "url": "/profile",
+            },
+            expires_in_days=30,
+        )
 
         return Response({"detail": "Host application rejected successfully."})
 
@@ -700,6 +737,21 @@ class AdminHostApplicationViewSet(GenericViewSet):
         user.is_host = False
         user.host_application_status = "needs_more_info"
         user.save(update_fields=["is_host", "host_application_status"])
+
+        create_notification(
+            recipient=user,
+            type=Notification.Type.HOST_APPLICATION_NEEDS_INFO,
+            title="More information required",
+            message=application.review_notes
+            or "Please provide more information for your host application.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "application_id": application.id,
+                "url": "/profile",
+            },
+            expires_in_days=30,
+        )
 
         return Response(
             {"detail": "Application marked as needs more info successfully."}
@@ -795,6 +847,19 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Approved by admin")
             listing.save()
+            create_notification(
+                recipient=listing.host,
+                type=Notification.Type.LISTING_APPROVED,
+                title="Listing approved",
+                message=f"Your listing '{listing.title}' has been approved and published.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "listing_id": listing.id,
+                    "url": "/my-properties",
+                },
+                expires_in_days=30,
+            )
             return Response({"detail": "Listing approved successfully."})
         except Listing.DoesNotExist:
             return Response(
@@ -810,6 +875,20 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Rejected by admin")
             listing.save()
+            create_notification(
+                recipient=listing.host,
+                type=Notification.Type.LISTING_REJECTED,
+                title="Listing rejected",
+                message=listing.moderation_reason
+                or f"Your listing '{listing.title}' was rejected.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "listing_id": listing.id,
+                    "url": "/my-properties",
+                },
+                expires_in_days=30,
+            )
             return Response({"detail": "Listing rejected successfully."})
         except Listing.DoesNotExist:
             return Response(
@@ -825,6 +904,20 @@ class AdminListingViewSet(GenericViewSet):
             listing.moderated_at = timezone.now()
             listing.moderation_reason = request.data.get("reason", "Suspended by admin")
             listing.save()
+            create_notification(
+                recipient=listing.host,
+                type=Notification.Type.LISTING_SUSPENDED,
+                title="Listing suspended",
+                message=listing.moderation_reason
+                or f"Your listing '{listing.title}' was suspended.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "listing_id": listing.id,
+                    "url": "/my-properties",
+                },
+                expires_in_days=30,
+            )
             return Response({"detail": "Listing suspended successfully."})
         except Listing.DoesNotExist:
             return Response(
@@ -898,48 +991,6 @@ class AdminReviewViewSet(GenericViewSet):
             )
 
 
-# class HostApplicationCreateView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-
-#     def post(self, request):
-#         if HostApplication.objects.filter(user=request.user).exists():
-#             return Response(
-#                 {"detail": "You have already submitted an application."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-#         serializer = HostApplicationSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save(user=request.user)
-#             request.user.host_application_status = "pending"
-#             request.user.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# class HostApplicationCreateView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         if HostApplication.objects.filter(user=request.user).exists():
-#             return Response(
-#                 {"detail": "You have already submitted an application."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-
-#         serializer = HostApplicationSerializer(
-#             data=request.data, context={"request": request}
-#         )
-
-#         if serializer.is_valid():
-#             serializer.save()
-
-#             request.user.host_application_status = "pending"
-#             request.user.save(update_fields=["host_application_status"])
-
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class HostApplicationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -985,12 +1036,55 @@ class HostApplicationCreateView(APIView):
             request.user.host_application_status = "pending"
             request.user.save(update_fields=["host_application_status"])
 
-            return Response(
-                serializer.data,
-                status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
-            )
+            application = HostApplication.objects.get(user=request.user)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if is_update:
+                notify_admins(
+                    type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
+                    title="Host application updated",
+                    message=f"{request.user.first_name} {request.user.last_name} updated their host application.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "application_id": application.id,
+                        "url": "/admin",
+                    },
+                    expires_in_days=30,
+                )
+            else:
+                create_notification(
+                    recipient=request.user,
+                    type=Notification.Type.HOST_APPLICATION_SUBMITTED,
+                    title="Application submitted",
+                    message="Your host application has been submitted and is now under review.",
+                    actor=request.user,
+                    priority=Notification.Priority.MEDIUM,
+                    data={
+                        "application_id": application.id,
+                        "url": "/profile",
+                    },
+                    expires_in_days=7,
+                )
+
+                notify_admins(
+                    type=Notification.Type.ADMIN_NEW_HOST_APPLICATION,
+                    title="New host application",
+                    message=f"{request.user.first_name} {request.user.last_name} submitted a new host application.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "application_id": application.id,
+                        "url": "/admin",
+                    },
+                    expires_in_days=30,
+                )
+
+                return Response(
+                    serializer.data,
+                    status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
+                )
+
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ListingViewSet(GenericViewSet):
@@ -1029,7 +1123,8 @@ class ListingViewSet(GenericViewSet):
             return Response(serializer.data)
         except Listing.DoesNotExist:
             return Response(
-                {"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Listing not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
     def create(self, request):
@@ -1038,15 +1133,48 @@ class ListingViewSet(GenericViewSet):
                 {"detail": "You must be a host to create a listing."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
         serializer = ListingCreateSerializer(data=request.data)
         if serializer.is_valid():
             listing = serializer.save(host=request.user, status="pending")
             images = request.FILES.getlist("images")
+
             for i, image_file in enumerate(images):
                 ListingImage.objects.create(
-                    listing=listing, image=image_file, is_primary=(i == 0)
+                    listing=listing,
+                    image=image_file,
+                    is_primary=(i == 0),
                 )
+
+            create_notification(
+                recipient=request.user,
+                type=Notification.Type.LISTING_SUBMITTED,
+                title="Listing submitted",
+                message=f"Your listing '{listing.title}' has been submitted for admin review.",
+                actor=request.user,
+                priority=Notification.Priority.MEDIUM,
+                data={
+                    "listing_id": listing.id,
+                    "url": "/my-properties",
+                },
+                expires_in_days=7,
+            )
+
+            notify_admins(
+                type=Notification.Type.ADMIN_NEW_LISTING_PENDING,
+                title="New listing pending review",
+                message=f"A new listing '{listing.title}' was submitted by {request.user.first_name} {request.user.last_name}.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "listing_id": listing.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
@@ -1055,19 +1183,54 @@ class ListingViewSet(GenericViewSet):
             serializer = ListingCreateSerializer(
                 listing, data=request.data, partial=True
             )
+
             if serializer.is_valid():
                 listing = serializer.save(status="pending")
+
+                create_notification(
+                    recipient=request.user,
+                    type=Notification.Type.LISTING_SUBMITTED,
+                    title="Listing submitted",
+                    message=f"Your listing '{listing.title}' has been submitted for admin review.",
+                    actor=request.user,
+                    priority=Notification.Priority.MEDIUM,
+                    data={
+                        "listing_id": listing.id,
+                        "url": "/my-properties",
+                    },
+                    expires_in_days=7,
+                )
+
+                notify_admins(
+                    type=Notification.Type.ADMIN_NEW_LISTING_PENDING,
+                    title="New listing pending review",
+                    message=f"A new listing '{listing.title}' was submitted by {request.user.first_name} {request.user.last_name}.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "listing_id": listing.id,
+                        "url": "/admin",
+                    },
+                    expires_in_days=30,
+                )
+
                 if "images" in request.FILES:
                     images = request.FILES.getlist("images")
                     for image_file in images:
                         ListingImage.objects.create(
-                            listing=listing, image=image_file, is_primary=False
+                            listing=listing,
+                            image=image_file,
+                            is_primary=False,
                         )
+
                 return Response(serializer.data)
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         except Listing.DoesNotExist:
             return Response(
-                {"detail": "Listing not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Listing not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
     @action(detail=True, methods=["post"])
@@ -1075,19 +1238,23 @@ class ListingViewSet(GenericViewSet):
         image_id = request.data.get("image_id")
         try:
             image = ListingImage.objects.get(
-                id=image_id, listing_id=pk, listing__host=request.user
+                id=image_id,
+                listing_id=pk,
+                listing__host=request.user,
             )
             image.delete()
             return Response({"detail": "Image deleted successfully."})
         except ListingImage.DoesNotExist:
             return Response(
-                {"detail": "Image not found."}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Image not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def toggle_wishlist(self, request, pk=None):
         listing = self.get_object()
         wishlist_item = Wishlist.objects.filter(user=request.user, listing=listing)
+
         if wishlist_item.exists():
             wishlist_item.delete()
             return Response(
@@ -1101,7 +1268,8 @@ class ListingViewSet(GenericViewSet):
     def booked_dates(self, request, pk=None):
         listing = self.get_object()
         bookings = Booking.objects.filter(
-            listing=listing, status__in=["confirmed", "paid", "completed"]
+            listing=listing,
+            status__in=["confirmed", "paid", "completed"],
         ).values("check_in", "check_out")
         return Response(list(bookings))
 
@@ -1185,74 +1353,6 @@ def generate_esewa_signature(total_amount, transaction_uuid, product_code):
     return signature
 
 
-# class BookingCreateView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         serializer = BookingCreateSerializer(data=request.data)
-#         if not serializer.is_valid():
-#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#         listing = serializer.validated_data["listing"]
-#         check_in = serializer.validated_data["check_in"]
-#         check_out = serializer.validated_data["check_out"]
-
-#         nights = Decimal((check_out - check_in).days)
-#         price_per_night = Decimal(listing.price_per_night)
-#         cleaning_fee = Decimal(listing.cleaning_fee or 0)
-#         service_fee = (price_per_night * nights * Decimal("0.05")).quantize(
-#             Decimal("0.01")
-#         )
-#         total_amount = (price_per_night * nights + cleaning_fee + service_fee).quantize(
-#             Decimal("0.01")
-#         )
-
-#         booking = serializer.save(
-#             guest=request.user,
-#             total_amount=total_amount,
-#             cleaning_fee=cleaning_fee,
-#             service_fee=service_fee,
-#             status="pending",
-#             payment_status="unpaid",
-#         )
-
-#         try:
-#             host = listing.host
-#             send_mail(
-#                 subject=f"RoamNepalStay - New Booking for {listing.title}",
-#                 message=(
-#                     f"Hi {host.first_name},\n\n"
-#                     f"You have a new booking for your property: {listing.title}.\n"
-#                     f"- Guest: {request.user.first_name} {request.user.last_name}\n"
-#                     f"- Dates: {check_in} to {check_out}\n"
-#                     f"- Total Amount: Rs. {total_amount}\n\n"
-#                     f"Regards,\nRoamNepalStay"
-#                 ),
-#                 from_email=settings.DEFAULT_FROM_EMAIL,
-#                 recipient_list=[host.email],
-#                 fail_silently=True,
-#             )
-#             send_mail(
-#                 subject=f"RoamNepalStay - Booking Created for {listing.title}",
-#                 message=(
-#                     f"Hi {request.user.first_name},\n\n"
-#                     f"Your booking for {listing.title} has been created successfully!\n"
-#                     f"- Dates: {check_in} to {check_out}\n"
-#                     f"- Total Amount: Rs. {total_amount}\n\n"
-#                     f"Please proceed to payment.\n\n"
-#                     f"Regards,\nRoamNepalStay"
-#                 ),
-#                 from_email=settings.DEFAULT_FROM_EMAIL,
-#                 recipient_list=[request.user.email],
-#                 fail_silently=True,
-#             )
-#         except Exception as e:
-#             print(f"Error sending emails: {e}")
-
-#         return Response(
-#             BookingDetailSerializer(booking, context={"request": request}).data,
-#             status=status.HTTP_201_CREATED,
-#         )
 from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.core.mail import send_mail
@@ -1265,6 +1365,135 @@ from .models import PlatformSetting
 from .serializers import BookingCreateSerializer, BookingDetailSerializer
 
 
+# class BookingCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         serializer = BookingCreateSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+
+#         listing = serializer.validated_data["listing"]
+#         check_in = serializer.validated_data["check_in"]
+#         check_out = serializer.validated_data["check_out"]
+
+#         if check_out <= check_in:
+#             return Response(
+#                 {"detail": "Check-out date must be after check-in date."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         nights = Decimal((check_out - check_in).days)
+
+#         if nights <= 0:
+#             return Response(
+#                 {"detail": "Booking must be at least 1 night."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         # Optional extra protection: stop host booking own property
+#         if listing.host == request.user:
+#             return Response(
+#                 {"detail": "You cannot book your own property."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         # Optional extra protection: allow only published listings
+#         if getattr(listing, "status", None) != "published":
+#             return Response(
+#                 {"detail": "This property is not available for booking."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         # Optional extra protection: prevent overlapping bookings
+#         overlapping_booking_exists = listing.bookings.filter(
+#             check_in__lt=check_out,
+#             check_out__gt=check_in,
+#             status__in=["pending", "confirmed", "paid", "completed"],
+#         ).exists()
+
+#         if overlapping_booking_exists:
+#             return Response(
+#                 {"detail": "Selected dates are already booked."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         platform_settings = PlatformSetting.get_settings()
+
+#         price_per_night = Decimal(listing.price_per_night).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         room_subtotal = (price_per_night * nights).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         cleaning_fee = Decimal(listing.cleaning_fee or 0).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         service_fee_percent = Decimal(
+#             platform_settings.service_fee_percent or 0
+#         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+#         service_fee = ((room_subtotal * service_fee_percent) / Decimal("100")).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         total_amount = (room_subtotal + cleaning_fee + service_fee).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         host_payout = (room_subtotal + cleaning_fee).quantize(
+#             Decimal("0.01"), rounding=ROUND_HALF_UP
+#         )
+
+#         superadmin_revenue = service_fee
+
+#         booking = serializer.save(
+#             guest=request.user,
+#             room_subtotal=room_subtotal,
+#             cleaning_fee=cleaning_fee,
+#             service_fee=service_fee,
+#             total_amount=total_amount,
+#             host_payout=host_payout,
+#             superadmin_revenue=superadmin_revenue,
+#             status=Booking.Status.DRAFT,
+#             payment_status=Booking.PaymentStatus.UNPAID,
+#         )
+#         create_notification(
+#             recipient=request.user,
+#             type=Notification.Type.BOOKING_CREATED,
+#             title="Booking created",
+#             message=f"Your booking for '{listing.title}' has been created. Please complete payment to confirm it.",
+#             actor=request.user,
+#             priority=Notification.Priority.MEDIUM,
+#             data={
+#                 "booking_id": booking.id,
+#                 "listing_id": listing.id,
+#                 "url": "/my-bookings",
+#             },
+#             expires_in_days=3,
+#         )
+
+
+#         create_notification(
+#             recipient=listing.host,
+#             type=Notification.Type.BOOKING_CREATED,
+#             title="New booking created",
+#             message=f"{request.user.first_name} {request.user.last_name} created a booking for '{listing.title}'.",
+#             actor=request.user,
+#             priority=Notification.Priority.HIGH,
+#             data={
+#                 "booking_id": booking.id,
+#                 "listing_id": listing.id,
+#                 "url": "/host/dashboard",
+#             },
+#             expires_in_days=7,
+#         )
+#         return Response(
+#             BookingDetailSerializer(booking, context={"request": request}).data,
+#             status=status.HTTP_201_CREATED,
+#         )
 class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1290,25 +1519,22 @@ class BookingCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Optional extra protection: stop host booking own property
         if listing.host == request.user:
             return Response(
                 {"detail": "You cannot book your own property."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Optional extra protection: allow only published listings
         if getattr(listing, "status", None) != "published":
             return Response(
                 {"detail": "This property is not available for booking."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Optional extra protection: prevent overlapping bookings
         overlapping_booking_exists = listing.bookings.filter(
             check_in__lt=check_out,
             check_out__gt=check_in,
-            status__in=["pending", "confirmed", "paid", "completed"],
+            status__in=["confirmed", "paid", "completed"],
         ).exists()
 
         if overlapping_booking_exists:
@@ -1361,6 +1587,36 @@ class BookingCreateView(APIView):
             payment_status=Booking.PaymentStatus.UNPAID,
         )
 
+        # create_notification(
+        #     recipient=request.user,
+        #     type=Notification.Type.BOOKING_CREATED,
+        #     title="Booking created",
+        #     message=f"Your booking for '{listing.title}' has been created. Please complete payment to confirm it.",
+        #     actor=request.user,
+        #     priority=Notification.Priority.MEDIUM,
+        #     data={
+        #         "booking_id": booking.id,
+        #         "listing_id": listing.id,
+        #         "url": "/my-bookings",
+        #     },
+        #     expires_in_days=3,
+        # )
+
+        # create_notification(
+        #     recipient=listing.host,
+        #     type=Notification.Type.BOOKING_CREATED,
+        #     title="New booking created",
+        #     message=f"{request.user.first_name} {request.user.last_name} created a booking for '{listing.title}'.",
+        #     actor=request.user,
+        #     priority=Notification.Priority.HIGH,
+        #     data={
+        #         "booking_id": booking.id,
+        #         "listing_id": listing.id,
+        #         "url": "/host/dashboard",
+        #     },
+        #     expires_in_days=7,
+        # )
+
         return Response(
             BookingDetailSerializer(booking, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -1388,10 +1644,8 @@ class BookingListView(APIView):
             status__in=["confirmed", "paid"],
         ).update(status="completed")
 
-        bookings = (
-            Booking.objects.filter(guest=request.user)
-            .exclude(status=Booking.Status.DRAFT)
-            .order_by("-created_at")
+        bookings = Booking.objects.filter(guest=request.user).exclude(
+            status=Booking.Status.DRAFT
         )
         serializer = BookingDetailSerializer(
             bookings, many=True, context={"request": request}
@@ -1435,6 +1689,20 @@ class BookingReviewCreateView(APIView):
 
         if serializer.is_valid():
             review = serializer.save()
+            create_notification(
+                recipient=booking.listing.host,
+                type=Notification.Type.REVIEW_RECEIVED,
+                title="New review received",
+                message=f"You received a new review for '{booking.listing.title}'.",
+                actor=request.user,
+                priority=Notification.Priority.MEDIUM,
+                data={
+                    "booking_id": booking.id,
+                    "listing_id": booking.listing.id,
+                    "url": "/host/dashboard",
+                },
+                expires_in_days=14,
+            )
             return Response(
                 {
                     "detail": "Review submitted successfully.",
@@ -1494,6 +1762,47 @@ class CashInHandBookingView(APIView):
         booking.payment_status = Booking.PaymentStatus.UNPAID
         booking.status = Booking.Status.CONFIRMED
         booking.save()
+        create_notification(
+            recipient=booking.guest,
+            type=Notification.Type.CASH_IN_HAND_SELECTED,
+            title="Cash in hand selected",
+            message=f"Your booking for '{booking.listing.title}' is confirmed with cash in hand payment.",
+            actor=request.user,
+            priority=Notification.Priority.MEDIUM,
+            data={
+                "booking_id": booking.id,
+                "url": "/my-bookings",
+            },
+            expires_in_days=7,
+        )
+
+        create_notification(
+            recipient=booking.listing.host,
+            type=Notification.Type.CASH_IN_HAND_SELECTED,
+            title="Cash payment booking confirmed",
+            message=f"A guest selected cash in hand for booking '{booking.listing.title}'.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "booking_id": booking.id,
+                "url": "/host/dashboard",
+            },
+            expires_in_days=30,
+        )
+
+        create_notification(
+            recipient=booking.guest,
+            type=Notification.Type.BOOKING_CONFIRMED,
+            title="Booking confirmed",
+            message=f"Your booking for '{booking.listing.title}' is confirmed.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "booking_id": booking.id,
+                "url": "/my-bookings",
+            },
+            expires_in_days=30,
+        )
 
         send_booking_confirmation_emails(booking)
 
@@ -1682,90 +1991,6 @@ class KhaltiInitiateView(APIView):
             )
 
 
-# class KhaltiVerifyView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         pidx = request.data.get("pidx")
-#         booking_id = request.data.get("booking_id")
-
-#         if not pidx or not booking_id:
-#             return Response(
-#                 {"detail": "pidx and booking_id are required."},
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-
-#         try:
-#             booking = Booking.objects.get(pk=booking_id, guest=request.user)
-#         except Booking.DoesNotExist:
-#             return Response(
-#                 {"detail": "Booking not found."},
-#                 status=status.HTTP_404_NOT_FOUND,
-#             )
-
-#         headers = {
-#             "Authorization": f"Key {settings.KHALTI_SECRET_KEY}",
-#             "Content-Type": "application/json",
-#         }
-
-#         try:
-#             response = requests.post(
-#                 settings.KHALTI_VERIFY_URL,
-#                 json={"pidx": pidx},
-#                 headers=headers,
-#                 timeout=30,
-#             )
-#             khalti_data = response.json()
-
-#             if response.status_code == 200 and khalti_data.get("status") == "Completed":
-#                 booking.payment_status = Booking.PaymentStatus.PAID
-#                 booking.status = Booking.Status.PAID
-#                 booking.payment_method = Booking.PaymentMethod.KHALTI
-#                 booking.khalti_transaction_id = khalti_data.get("transaction_id")
-#                 booking.paid_at = timezone.now()
-#                 booking.save()
-
-#                 host = booking.listing.host
-#                 send_mail(
-#                     subject=f"New Paid Booking - {booking.listing.title}",
-#                     message=(
-#                         f"Hi {host.first_name},\n\n"
-#                         f"You have a new paid booking!\n"
-#                         f"Property: {booking.listing.title}\n"
-#                         f"Dates: {booking.check_in} to {booking.check_out}\n\n"
-#                         f"Regards,\nRoamNepalStay"
-#                     ),
-#                     from_email=settings.DEFAULT_FROM_EMAIL,
-#                     recipient_list=[host.email],
-#                     fail_silently=True,
-#                 )
-
-#                 return Response(
-#                     {
-#                         "detail": "Khalti payment verified successfully.",
-#                         "booking": BookingDetailSerializer(
-#                             booking, context={"request": request}
-#                         ).data,
-#                     }
-#                 )
-
-#             booking.payment_status = Booking.PaymentStatus.FAILED
-#             booking.save()
-
-#             return Response(
-#                 {
-#                     "detail": "Khalti payment verification failed.",
-#                     "khalti_details": khalti_data,
-#                 },
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-
-
-#         except Exception as e:
-#             return Response(
-#                 {"detail": f"Khalti verification error: {str(e)}"},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
 class KhaltiVerifyView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1791,6 +2016,21 @@ class KhaltiVerifyView(APIView):
             return Response(
                 {"detail": "Invalid payment reference for this booking."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Prevent duplicate verification and duplicate notifications
+        if (
+            booking.payment_status == Booking.PaymentStatus.PAID
+            and booking.status == Booking.Status.CONFIRMED
+        ):
+            return Response(
+                {
+                    "detail": "Payment already verified.",
+                    "booking": BookingDetailSerializer(
+                        booking, context={"request": request}
+                    ).data,
+                },
+                status=status.HTTP_200_OK,
             )
 
         headers = {
@@ -1819,7 +2059,7 @@ class KhaltiVerifyView(APIView):
                 and khalti_amount == expected_amount
             ):
                 booking.payment_status = Booking.PaymentStatus.PAID
-                booking.status = Booking.Status.PAID
+                booking.status = Booking.Status.CONFIRMED
                 booking.payment_method = Booking.PaymentMethod.KHALTI
                 booking.khalti_token = pidx
                 booking.khalti_transaction_id = (
@@ -1829,6 +2069,48 @@ class KhaltiVerifyView(APIView):
                 )
                 booking.paid_at = timezone.now()
                 booking.save()
+
+                create_notification(
+                    recipient=booking.guest,
+                    type=Notification.Type.BOOKING_PAID,
+                    title="Payment successful",
+                    message=f"Your payment for '{booking.listing.title}' was successful and your booking is confirmed.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "url": "/my-bookings",
+                    },
+                    expires_in_days=7,
+                )
+
+                create_notification(
+                    recipient=booking.listing.host,
+                    type=Notification.Type.BOOKING_PAID,
+                    title="Guest payment received",
+                    message=f"Payment has been completed for booking '{booking.listing.title}'.",
+                    actor=booking.guest,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "url": "/host/dashboard",
+                    },
+                    expires_in_days=7,
+                )
+
+                notify_admins(
+                    type=Notification.Type.BOOKING_CONFIRMED,
+                    title="Booking payment completed",
+                    message=f"Payment and confirmation completed for '{booking.listing.title}'.",
+                    actor=booking.guest,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "listing_id": booking.listing.id,
+                        "url": "/admin/dashboard",
+                    },
+                    expires_in_days=30,
+                )
 
                 send_booking_confirmation_emails(booking)
 
@@ -1844,6 +2126,33 @@ class KhaltiVerifyView(APIView):
 
             booking.payment_status = Booking.PaymentStatus.FAILED
             booking.save(update_fields=["payment_status", "updated_at"])
+
+            create_notification(
+                recipient=booking.guest,
+                type=Notification.Type.BOOKING_PAYMENT_FAILED,
+                title="Payment failed",
+                message=f"Your Khalti payment for '{booking.listing.title}' could not be verified.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "booking_id": booking.id,
+                    "url": "/my-bookings",
+                },
+                expires_in_days=7,
+            )
+
+            notify_admins(
+                type=Notification.Type.ADMIN_PAYMENT_FAILED,
+                title="Payment verification failed",
+                message=f"Khalti verification failed for booking #{booking.id}.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "booking_id": booking.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
 
             return Response(
                 {
@@ -1942,89 +2251,156 @@ class EsewaInitiateView(APIView):
 from decimal import Decimal, ROUND_HALF_UP
 
 
-class EsewaVerifyView(APIView):
-    permission_classes = [IsAuthenticated]
+# class EsewaVerifyView(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        booking_id = request.data.get("booking_id")
+#     def post(self, request):
+#         booking_id = request.data.get("booking_id")
 
-        if not booking_id:
-            return Response(
-                {"detail": "booking_id is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#         if not booking_id:
+#             return Response(
+#                 {"detail": "booking_id is required."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
 
-        try:
-            booking = Booking.objects.get(pk=booking_id, guest=request.user)
-        except Booking.DoesNotExist:
-            return Response(
-                {"detail": "Booking not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+#         try:
+#             booking = Booking.objects.get(pk=booking_id, guest=request.user)
+#         except Booking.DoesNotExist:
+#             return Response(
+#                 {"detail": "Booking not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
 
-        if not booking.esewa_transaction_uuid:
-            return Response(
-                {"detail": "eSewa transaction UUID not found for this booking."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#         if not booking.esewa_transaction_uuid:
+#             return Response(
+#                 {"detail": "eSewa transaction UUID not found for this booking."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
 
-        total_amount = str(
-            Decimal(booking.total_amount).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-        )
+#         total_amount = str(
+#             Decimal(booking.total_amount).quantize(
+#                 Decimal("0.01"), rounding=ROUND_HALF_UP
+#             )
+#         )
 
-        params = {
-            "product_code": settings.ESEWA_PRODUCT_CODE.strip(),
-            "total_amount": total_amount,
-            "transaction_uuid": booking.esewa_transaction_uuid,
-        }
+#         params = {
+#             "product_code": settings.ESEWA_PRODUCT_CODE.strip(),
+#             "total_amount": total_amount,
+#             "transaction_uuid": booking.esewa_transaction_uuid,
+#         }
 
-        try:
-            response = requests.get(
-                settings.ESEWA_STATUS_CHECK_URL,
-                params=params,
-                timeout=30,
-            )
-            esewa_data = response.json()
+#         try:
+#             response = requests.get(
+#                 settings.ESEWA_STATUS_CHECK_URL,
+#                 params=params,
+#                 timeout=30,
+#             )
+#             esewa_data = response.json()
 
-            if response.status_code == 200 and esewa_data.get("status") == "COMPLETE":
-                booking.payment_status = Booking.PaymentStatus.PAID
-                booking.status = Booking.Status.PAID
-                booking.payment_method = Booking.PaymentMethod.ESEWA
-                booking.esewa_ref_id = esewa_data.get("ref_id") or esewa_data.get(
-                    "transaction_code"
-                )
-                booking.paid_at = timezone.now()
-                booking.save()
+#             if response.status_code == 200 and esewa_data.get("status") == "COMPLETE":
+#                 booking.payment_status = Booking.PaymentStatus.PAID
+#                 booking.status = Booking.Status.CONFIRMED
+#                 booking.payment_method = Booking.PaymentMethod.ESEWA
+#                 booking.esewa_ref_id = esewa_data.get("ref_id") or esewa_data.get(
+#                     "transaction_code"
+#                 )
+#                 booking.paid_at = timezone.now()
+#                 booking.save()
+#                 create_notification(
+#                     recipient=booking.guest,
+#                     type=Notification.Type.BOOKING_PAID,
+#                     title="Payment successful",
+#                     message=f"Your Khalti payment for '{booking.listing.title}' was successful.",
+#                     actor=request.user,
+#                     priority=Notification.Priority.HIGH,
+#                     data={
+#                         "booking_id": booking.id,
+#                         "url": "/my-bookings",
+#                     },
+#                     expires_in_days=30,
+#                 )
 
-                send_booking_confirmation_emails(booking)
+#                 create_notification(
+#                     recipient=booking.listing.host,
+#                     type=Notification.Type.BOOKING_PAID,
+#                     title="Guest payment received",
+#                     message=f"Payment has been completed for booking '{booking.listing.title}'.",
+#                     actor=booking.guest,
+#                     priority=Notification.Priority.HIGH,
+#                     data={
+#                         "booking_id": booking.id,
+#                         "url": "/host/dashboard",
+#                     },
+#                     expires_in_days=30,
+#                 )
 
-                return Response(
-                    {
-                        "detail": "eSewa payment verified successfully.",
-                        "booking": BookingDetailSerializer(
-                            booking, context={"request": request}
-                        ).data,
-                    }
-                )
+#                 create_notification(
+#                     recipient=booking.guest,
+#                     type=Notification.Type.BOOKING_CONFIRMED,
+#                     title="Booking confirmed",
+#                     message=f"Your booking for '{booking.listing.title}' is confirmed.",
+#                     actor=request.user,
+#                     priority=Notification.Priority.HIGH,
+#                     data={
+#                         "booking_id": booking.id,
+#                         "url": "/my-bookings",
+#                     },
+#                     expires_in_days=30,
+#                 )
 
-            booking.payment_status = Booking.PaymentStatus.FAILED
-            booking.save()
+#                 send_booking_confirmation_emails(booking)
 
-            return Response(
-                {
-                    "detail": "eSewa payment verification failed.",
-                    "esewa_details": esewa_data,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#                 return Response(
+#                     {
+#                         "detail": "eSewa payment verified successfully.",
+#                         "booking": BookingDetailSerializer(
+#                             booking, context={"request": request}
+#                         ).data,
+#                     }
+#                 )
 
-        except Exception as e:
-            return Response(
-                {"detail": f"eSewa verification error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+#             booking.payment_status = Booking.PaymentStatus.FAILED
+#             booking.save()
+#             create_notification(
+#                 recipient=booking.guest,
+#                 type=Notification.Type.BOOKING_PAYMENT_FAILED,
+#                 title="Payment failed",
+#                 message=f"Your Esewa payment for '{booking.listing.title}' could not be verified.",
+#                 actor=request.user,
+#                 priority=Notification.Priority.HIGH,
+#                 data={
+#                     "booking_id": booking.id,
+#                     "url": "/my-bookings",
+#                 },
+#                 expires_in_days=7,
+#             )
+
+#             notify_admins(
+#                 type=Notification.Type.ADMIN_PAYMENT_FAILED,
+#                 title="Payment verification failed",
+#                 message=f"Esewa verification failed for booking #{booking.id}.",
+#                 actor=request.user,
+#                 priority=Notification.Priority.HIGH,
+#                 data={
+#                     "booking_id": booking.id,
+#                     "url": "/admin",
+#                 },
+#                 expires_in_days=30,
+#             )
+
+#             return Response(
+#                 {
+#                     "detail": "eSewa payment verification failed.",
+#                     "esewa_details": esewa_data,
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         except Exception as e:
+#             return Response(
+#                 {"detail": f"eSewa verification error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
 
 
 class CancelBookingView(APIView):
@@ -2059,6 +2435,33 @@ class CancelBookingView(APIView):
             booking.payment_status = Booking.PaymentStatus.FAILED
 
         booking.save()
+        create_notification(
+            recipient=booking.guest,
+            type=Notification.Type.BOOKING_CANCELLED,
+            title="Booking cancelled",
+            message=f"Your booking for '{booking.listing.title}' was cancelled successfully.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "booking_id": booking.id,
+                "url": "/my-bookings",
+            },
+            expires_in_days=30,
+        )
+
+        create_notification(
+            recipient=booking.listing.host,
+            type=Notification.Type.BOOKING_CANCELLED,
+            title="Booking cancelled by guest",
+            message=f"A guest cancelled booking for '{booking.listing.title}'.",
+            actor=request.user,
+            priority=Notification.Priority.HIGH,
+            data={
+                "booking_id": booking.id,
+                "url": "/host/dashboard",
+            },
+            expires_in_days=30,
+        )
 
         return Response(
             {
@@ -2069,6 +2472,190 @@ class CancelBookingView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class EsewaVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        booking_id = request.data.get("booking_id")
+
+        if not booking_id:
+            return Response(
+                {"detail": "booking_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            booking = Booking.objects.get(pk=booking_id, guest=request.user)
+        except Booking.DoesNotExist:
+            return Response(
+                {"detail": "Booking not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not booking.esewa_transaction_uuid:
+            return Response(
+                {"detail": "eSewa transaction UUID not found for this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Prevent duplicate verification and duplicate notifications
+        if (
+            booking.payment_status == Booking.PaymentStatus.PAID
+            and booking.status == Booking.Status.CONFIRMED
+        ):
+            return Response(
+                {
+                    "detail": "Payment already verified.",
+                    "booking": BookingDetailSerializer(
+                        booking, context={"request": request}
+                    ).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        total_amount = str(
+            Decimal(booking.total_amount).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        )
+
+        params = {
+            "product_code": settings.ESEWA_PRODUCT_CODE.strip(),
+            "total_amount": total_amount,
+            "transaction_uuid": booking.esewa_transaction_uuid,
+        }
+
+        try:
+            response = requests.get(
+                settings.ESEWA_STATUS_CHECK_URL,
+                params=params,
+                timeout=30,
+            )
+            esewa_data = response.json()
+
+            if response.status_code == 200 and esewa_data.get("status") == "COMPLETE":
+                booking.payment_status = Booking.PaymentStatus.PAID
+                booking.status = Booking.Status.CONFIRMED
+                booking.payment_method = Booking.PaymentMethod.ESEWA
+                booking.esewa_ref_id = esewa_data.get("ref_id") or esewa_data.get(
+                    "transaction_code"
+                )
+                booking.paid_at = timezone.now()
+                booking.save()
+
+                create_notification(
+                    recipient=booking.guest,
+                    type=Notification.Type.BOOKING_PAID,
+                    title="Payment successful",
+                    message=f"Your eSewa payment for '{booking.listing.title}' was successful.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "url": "/my-bookings",
+                    },
+                    expires_in_days=30,
+                )
+
+                create_notification(
+                    recipient=booking.listing.host,
+                    type=Notification.Type.BOOKING_PAID,
+                    title="Guest payment received",
+                    message=f"Payment has been completed for booking '{booking.listing.title}'.",
+                    actor=booking.guest,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "url": "/host/dashboard",
+                    },
+                    expires_in_days=30,
+                )
+
+                create_notification(
+                    recipient=booking.guest,
+                    type=Notification.Type.BOOKING_CONFIRMED,
+                    title="Booking confirmed",
+                    message=f"Your booking for '{booking.listing.title}' is confirmed.",
+                    actor=request.user,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "url": "/my-bookings",
+                    },
+                    expires_in_days=30,
+                )
+
+                notify_admins(
+                    type=Notification.Type.BOOKING_CONFIRMED,
+                    title="Booking payment completed",
+                    message=f"Payment and confirmation completed for '{booking.listing.title}'.",
+                    actor=booking.guest,
+                    priority=Notification.Priority.HIGH,
+                    data={
+                        "booking_id": booking.id,
+                        "listing_id": booking.listing.id,
+                        "url": "/admin/dashboard",
+                    },
+                    expires_in_days=30,
+                )
+
+                send_booking_confirmation_emails(booking)
+
+                return Response(
+                    {
+                        "detail": "eSewa payment verified successfully.",
+                        "booking": BookingDetailSerializer(
+                            booking, context={"request": request}
+                        ).data,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            booking.payment_status = Booking.PaymentStatus.FAILED
+            booking.save(update_fields=["payment_status", "updated_at"])
+
+            create_notification(
+                recipient=booking.guest,
+                type=Notification.Type.BOOKING_PAYMENT_FAILED,
+                title="Payment failed",
+                message=f"Your eSewa payment for '{booking.listing.title}' could not be verified.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "booking_id": booking.id,
+                    "url": "/my-bookings",
+                },
+                expires_in_days=7,
+            )
+
+            notify_admins(
+                type=Notification.Type.ADMIN_PAYMENT_FAILED,
+                title="Payment verification failed",
+                message=f"Esewa verification failed for booking #{booking.id}.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "booking_id": booking.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
+
+            return Response(
+                {
+                    "detail": "eSewa payment verification failed.",
+                    "esewa_details": esewa_data,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": f"eSewa verification error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class BookingReceiptPDFView(APIView):
@@ -2505,3 +3092,265 @@ class PublicPlatformFeeAPIView(APIView):
     def get(self, request):
         settings_obj = PlatformSetting.get_settings()
         return Response({"service_fee_percent": settings_obj.service_fee_percent})
+
+
+class AIHomeChatAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        message = (request.data.get("message") or "").strip().lower()
+
+        if not message:
+            return Response(
+                {
+                    "reply": "Tell me what kind of trip you want, and I’ll suggest a place in Nepal.",
+                    "suggested_place": "",
+                    "button_text": "",
+                }
+            )
+
+        # Peaceful / romantic / lake / mountain
+        if any(
+            word in message
+            for word in [
+                "peaceful",
+                "calm",
+                "quiet",
+                "romantic",
+                "couple",
+                "lake",
+                "mountain",
+                "view",
+                "relax",
+                "sunrise",
+            ]
+        ):
+            return Response(
+                {
+                    "reply": "Pokhara is a great choice for a peaceful trip with lake views, mountain scenery, and relaxing stays.",
+                    "suggested_place": "Pokhara",
+                    "button_text": "Explore Pokhara",
+                }
+            )
+
+        # Jungle / wildlife / safari / nature
+        if any(
+            word in message
+            for word in ["jungle", "wildlife", "safari", "forest", "nature", "animal"]
+        ):
+            return Response(
+                {
+                    "reply": "Chitwan is perfect for jungle stays, wildlife experiences, and nature-focused travel.",
+                    "suggested_place": "Chitwan",
+                    "button_text": "Explore Chitwan",
+                }
+            )
+
+        # Trekking / hiking / hills / adventure
+        if any(
+            word in message
+            for word in ["trek", "trekking", "hike", "hiking", "adventure", "trail"]
+        ):
+            return Response(
+                {
+                    "reply": "Kori Hill is a beautiful option for a scenic trekking experience with mountain views and peaceful trails.",
+                    "suggested_place": "Kori Hill",
+                    "button_text": "Explore Kori Hill",
+                }
+            )
+
+        # Culture / heritage / temples
+        if any(
+            word in message
+            for word in [
+                "culture",
+                "heritage",
+                "temple",
+                "history",
+                "old city",
+                "traditional",
+            ]
+        ):
+            return Response(
+                {
+                    "reply": "Bhaktapur is a wonderful destination for culture, heritage, temples, and traditional local experience.",
+                    "suggested_place": "Bhaktapur",
+                    "button_text": "Explore Bhaktapur",
+                }
+            )
+
+        # Short trip / weekend / near kathmandu
+        if any(
+            word in message
+            for word in [
+                "weekend",
+                "short trip",
+                "near kathmandu",
+                "close",
+                "1 day",
+                "2 day",
+            ]
+        ):
+            return Response(
+                {
+                    "reply": "Nagarkot is a lovely option for a short and peaceful getaway with hill views and sunrise spots.",
+                    "suggested_place": "Nagarkot",
+                    "button_text": "Explore Nagarkot",
+                }
+            )
+
+        # Budget trip
+        if any(
+            word in message
+            for word in ["cheap", "budget", "low cost", "affordable", "save money"]
+        ):
+            return Response(
+                {
+                    "reply": "Pokhara is a strong budget-friendly option with many affordable stays and beautiful scenery.",
+                    "suggested_place": "Pokhara",
+                    "button_text": "Explore Pokhara",
+                }
+            )
+
+        # Family trip
+        if any(word in message for word in ["family", "kids", "children", "parents"]):
+            return Response(
+                {
+                    "reply": "Pokhara is a family-friendly destination with relaxing stays, sightseeing, and easy travel options.",
+                    "suggested_place": "Pokhara",
+                    "button_text": "Explore Pokhara",
+                }
+            )
+
+        # Default fallback
+        return Response(
+            {
+                "reply": "Pokhara is a great all-round destination with beautiful scenery, relaxing stays, and something for most travelers.",
+                "suggested_place": "Pokhara",
+                "button_text": "Explore Pokhara",
+            }
+        )
+
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        now = timezone.now()
+
+        notifications_qs = Notification.objects.filter(recipient=request.user).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+        )
+
+        scope = request.query_params.get("scope", "").strip().lower()
+        unread_only = request.query_params.get("unread_only", "").strip().lower()
+        limit = request.query_params.get("limit")
+
+        if scope in {"guest", "host", "admin"}:
+            notifications_qs = notifications_qs.filter(data__scope=scope)
+
+        if unread_only == "true":
+            notifications_qs = notifications_qs.filter(is_read=False)
+
+        unread_count_qs = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+        ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+
+        if scope in {"guest", "host", "admin"}:
+            unread_count_qs = unread_count_qs.filter(data__scope=scope)
+
+        unread_count = unread_count_qs.count()
+
+        notifications_qs = notifications_qs.order_by("-created_at")
+
+        if limit:
+            try:
+                limit = int(limit)
+                if limit > 0:
+                    notifications_qs = notifications_qs[:limit]
+            except (ValueError, TypeError):
+                pass
+
+        serializer = NotificationSerializer(notifications_qs, many=True)
+
+        return Response(
+            {
+                "count": len(serializer.data),
+                "unread_count": unread_count,
+                "results": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class NotificationMarkReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, notification_id):
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                recipient=request.user,
+            )
+        except Notification.DoesNotExist:
+            return Response(
+                {"detail": "Notification not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not notification.is_read:
+            notification.is_read = True
+            notification.read_at = timezone.now()
+            notification.save(update_fields=["is_read", "read_at"])
+
+        return Response({"detail": "Notification marked as read."})
+
+
+class NotificationMarkAllReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        scope = request.query_params.get("scope", "").strip().lower()
+
+        notifications = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+        )
+
+        if scope in {"guest", "host", "admin"}:
+            notification_ids = [
+                notification.id
+                for notification in notifications
+                if resolve_notification_scope(notification.type, notification.data)
+                == scope
+            ]
+
+            if notification_ids:
+                Notification.objects.filter(id__in=notification_ids).update(
+                    is_read=True,
+                    read_at=timezone.now(),
+                )
+        else:
+            notifications.update(is_read=True, read_at=timezone.now())
+
+        return Response({"detail": "All notifications marked as read."})
+
+
+class NotificationDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, notification_id):
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                recipient=request.user,
+            )
+        except Notification.DoesNotExist:
+            return Response(
+                {"detail": "Notification not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        notification.delete()
+        return Response({"detail": "Notification deleted successfully."})

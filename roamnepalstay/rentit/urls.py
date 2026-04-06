@@ -36,6 +36,13 @@ from .views import (
     HostAnalyticsView,
     PublicPlatformFeeAPIView,
     ListingMapAPIView,
+    # AI chat
+    AIHomeChatAPIView,
+    # notification
+    NotificationListView,
+    NotificationMarkReadView,
+    NotificationMarkAllReadView,
+    NotificationDeleteView,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -133,5 +140,22 @@ urlpatterns = [
         "public/platform-fee/",
         PublicPlatformFeeAPIView.as_view(),
         name="public-platform-fee",
+    ),
+    path("ai/home-chat/", AIHomeChatAPIView.as_view(), name="ai-home-chat"),
+    path("notifications/", NotificationListView.as_view(), name="notifications-list"),
+    path(
+        "notifications/<int:notification_id>/read/",
+        NotificationMarkReadView.as_view(),
+        name="notification-mark-read",
+    ),
+    path(
+        "notifications/mark-all-read/",
+        NotificationMarkAllReadView.as_view(),
+        name="notification-mark-all-read",
+    ),
+    path(
+        "notifications/<int:notification_id>/",
+        NotificationDeleteView.as_view(),
+        name="notification-delete",
     ),
 ]
