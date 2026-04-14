@@ -127,6 +127,10 @@ export default function LoginPage() {
         <button disabled={loading} type="submit" className="login-btn">
           {loading ? "Logging in..." : "LOG IN"}
         </button>
+        
+        <p className="login-footer">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
 
         <p className="login-footer">
           Don't have an account? <Link to="/register">Register Here</Link>

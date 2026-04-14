@@ -210,7 +210,7 @@ function RegisterPage() {
             </label>
 
             <button disabled={loading} type="submit" className="register-btn">
-              {loading ? "Creating..." : "Register"}
+              {loading ? "Creating..." : "REGISTER"}
             </button>
 
             <p className="register-footer">

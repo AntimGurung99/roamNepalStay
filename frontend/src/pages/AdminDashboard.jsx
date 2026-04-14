@@ -318,64 +318,113 @@ import AdminCharts from "../components/admin/AdminCharts";
 import PlatformSettingsManagement from "../components/admin/PlatformSettingsManagement";
 import NotificationBell from "../components/NotificationBell";
 import logo from "../assets/mainlogo.jpg";
+import { MdStar } from "react-icons/md";
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const [chartPeriod, setChartPeriod] = useState("monthly");
+  const [selectedCity, setSelectedCity] = useState("all");
 
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!storedUser.is_staff && !storedUser.is_superuser) {
-      console.warn("Access denied. Redirecting.");
-      navigate("/");
-      return;
-    }
-    setUser(storedUser);
-    fetchDashboardStats();
-  }, [navigate]);
+  // useEffect(() => {
+  //   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  //   if (!storedUser.is_staff && !storedUser.is_superuser) {
+  //     console.warn("Access denied. Redirecting.");
+  //     navigate("/");
+  //     return;
+  //   }
+  //   setUser(storedUser);
+  //   fetchDashboardStats();
+  // }, [navigate]);
 
-  const fetchDashboardStats = async () => {
+ useEffect(() => {
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (!storedUser.is_staff && !storedUser.is_superuser) {
+    console.warn("Access denied. Redirecting.");
+    navigate("/");
+    return;
+  }
+
+  setUser(storedUser);
+  fetchDashboardStats("monthly", "all", false);
+}, [navigate])
+
+
+const fetchDashboardStats = async (
+  period = chartPeriod,
+  city = selectedCity,
+  isFilterChange = false
+) => {
+  if (isFilterChange) {
+    setChartLoading(true);
+  } else {
     setLoading(true);
-    setError(null);
+  }
 
-    try {
-      const token = localStorage.getItem("access");
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/admin/dashboard/stats/",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+  setError(null);
 
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      } else {
-        setError("Failed to fetch dashboard statistics. Authentication or Server Error.");
+  try {
+    const token = localStorage.getItem("access");
+
+    const query = new URLSearchParams({
+      period,
+      city,
+    }).toString();
+
+    const response = await fetch(
+      `http://127.0.0.1:8000/api/admin/dashboard/stats/?${query}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       }
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      setError("Connection error. Could not reach backend.");
-    } finally {
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      setStats(data);
+    } else {
+      setError(
+        "Failed to fetch dashboard statistics. Authentication or Server Error."
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    setError("Connection error. Could not reach backend.");
+  } finally {
+    if (isFilterChange) {
+      setChartLoading(false);
+    } else {
       setLoading(false);
     }
-  };
-
-  if (loading) {
-    return (
-      <div className="admin-loading">
-        <div className="loading-spinner"></div>
-        <p>Establishing secure admin session...</p>
-      </div>
-    );
   }
+};
+
+const handlePeriodChange = (newPeriod) => {
+  setChartPeriod(newPeriod);
+  fetchDashboardStats(newPeriod, selectedCity, true);
+};
+
+const handleCityChange = (newCity) => {
+  setSelectedCity(newCity);
+  fetchDashboardStats(chartPeriod, newCity, true);
+};
+
+  if (loading && !stats) {
+  return (
+    <div className="admin-loading">
+      <div className="loading-spinner"></div>
+      <p>Establishing secure admin session...</p>
+    </div>
+  );
+}
 
   if (error) {
     return (
@@ -384,7 +433,14 @@ const AdminDashboard = () => {
           <h1>System Error</h1>
           <p>{error}</p>
           <div className="error-actions">
-            <button onClick={fetchDashboardStats} className="btn-retry">
+            {/* <button onClick={fetchDashboardStats} className="btn-retry">
+              Try Again
+            </button> */}
+
+            <button
+              onClick={() => fetchDashboardStats(chartPeriod, selectedCity, false)}
+              className="btn-retry"
+            >
               Try Again
             </button>
             <button onClick={() => navigate("/")} className="btn-back">
@@ -496,7 +552,17 @@ const AdminDashboard = () => {
 
       <div className="admin-container">
         <main className="admin-main-content">
-          {activeTab === "dashboard" && <DashboardOverview stats={stats} />}
+          {/* {activeTab === "dashboard" && <DashboardOverview stats={stats} />} */}
+          {activeTab === "dashboard" && (
+            <DashboardOverview
+              stats={stats}
+              chartPeriod={chartPeriod}
+              selectedCity={selectedCity}
+              chartLoading={chartLoading}
+              onPeriodChange={handlePeriodChange}
+              onCityChange={handleCityChange}
+            />
+          )}
           {activeTab === "users" && <UsersManagement />}
           {activeTab === "host-applications" && (
             <HostApplicationsManagement onActionComplete={fetchDashboardStats} />
@@ -519,7 +585,15 @@ const AdminDashboard = () => {
   );
 };
 
-const DashboardOverview = ({ stats }) => {
+// const DashboardOverview = ({ stats }) => 
+const DashboardOverview = ({
+  stats,
+  chartPeriod,
+  selectedCity,
+  chartLoading,
+  onPeriodChange,
+  onCityChange,
+ }) => {
   if (!stats) return <div className="loading-stats">Refreshing stats...</div>;
 
   return (
@@ -573,7 +647,15 @@ const DashboardOverview = ({ stats }) => {
         </div>
       </div>
 
-      <AdminCharts stats={stats} />
+      {/* <AdminCharts stats={stats} /> */}
+      <AdminCharts
+        stats={stats}
+        period={chartPeriod}
+        selectedCity={selectedCity}
+        chartLoading={chartLoading}
+        onPeriodChange={onPeriodChange}
+        onCityChange={onCityChange}
+      />
 
       <div className="recent-activities">
         <div className="recent-section card-elevated">
@@ -618,7 +700,11 @@ const DashboardOverview = ({ stats }) => {
                   <small>{new Date(review.created_at).toLocaleDateString()}</small>
                 </div>
 
-                <div className="recent-rating">{review.rating}</div>
+                <div className="feedback-rating">
+                    <span className="feedback-star"><MdStar /></span>
+                    <span className="feedback-rating-value">{review.rating}</span>
+                </div>
+                {/* <div className="recent-rating">{review.rating}</div> */}
               </div>
             ))}
           </div>

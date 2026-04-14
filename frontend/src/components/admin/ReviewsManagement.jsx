@@ -1,35 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/AdminComponents.css';
+import { LiaStarSolid } from "react-icons/lia";
 
-// Reviews Management Component - For managing system reviews
 const ReviewsManagement = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [approvedFilter, setApprovedFilter] = useState('all');
 
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            fetchReviews();
-        }, 500);
-        return () => clearTimeout(timeoutId);
-    }, [approvedFilter]);
+        fetchReviews();
+    }, []);
 
     const fetchReviews = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('access');
-            let url = 'http://127.0.0.1:8000/api/admin/reviews/';
-            
-            if (approvedFilter === 'true') url += '?approved=true';
-            else if (approvedFilter === 'false') url += '?approved=false';
-
-            const response = await fetch(url, {
+            const response = await fetch('http://127.0.0.1:8000/api/admin/reviews/', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 setReviews(data.results || data);
@@ -44,14 +35,17 @@ const ReviewsManagement = () => {
     const handleToggleApproval = async (reviewId) => {
         try {
             const token = localStorage.getItem('access');
-            const response = await fetch(`http://127.0.0.1:8000/api/admin/reviews/${reviewId}/toggle_approval/`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/admin/reviews/${reviewId}/toggle_approval/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
                 }
-            });
-            
+            );
+
             if (response.ok) {
                 fetchReviews();
             }
@@ -76,20 +70,6 @@ const ReviewsManagement = () => {
                 <p>Review and moderate user experiences</p>
             </div>
 
-            <div className="controls-section">
-                <div className="filter-controls">
-                    <select 
-                        value={approvedFilter} 
-                        onChange={(e) => setApprovedFilter(e.target.value)}
-                        className="filter-select"
-                    >
-                        <option value="all">All Reviews</option>
-                        <option value="true">Approved</option>
-                        <option value="false">Pending Approval</option>
-                    </select>
-                </div>
-            </div>
-
             <div className="table-container">
                 <table className="admin-table">
                     <thead>
@@ -104,15 +84,15 @@ const ReviewsManagement = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {reviews.map(review => (
+                        {reviews.map((review) => (
                             <tr key={review.id}>
                                 <td>
                                     <strong>{review.reviewer_name}</strong>
                                 </td>
                                 <td>{review.listing_title}</td>
                                 <td>
-                                    <span style={{ color: '#ffc107', fontWeight: 'bold' }}>
-                                        ★ {review.rating}
+                                    <span style={{ color: '#1e1c17', fontWeight: 'bold' }}>
+                                         <LiaStarSolid />{review.rating}
                                     </span>
                                 </td>
                                 <td>
@@ -121,13 +101,17 @@ const ReviewsManagement = () => {
                                     </div>
                                 </td>
                                 <td>
-                                    <span className={`status-badge ${review.is_approved ? 'status-approved' : 'status-rejected'}`}>
+                                    <span
+                                        className={`status-badge ${
+                                            review.is_approved ? 'status-approved' : 'status-rejected'
+                                        }`}
+                                    >
                                         {review.is_approved ? 'Approved' : 'Unapproved'}
                                     </span>
                                 </td>
                                 <td>{new Date(review.created_at).toLocaleDateString()}</td>
                                 <td>
-                                    <button 
+                                    <button
                                         onClick={() => handleToggleApproval(review.id)}
                                         className={`btn ${review.is_approved ? 'btn-danger' : 'btn-success'}`}
                                     >

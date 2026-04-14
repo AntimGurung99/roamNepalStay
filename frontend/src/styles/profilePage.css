@@ -16,7 +16,7 @@
   width: 100%;
   max-width: 500px;
   border-radius: 16px;
-  padding: 32px;
+  padding: 25px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   text-align: center;
 }
@@ -105,11 +105,42 @@
   text-align: center;
 }
 
-.profile-details {
+/* .profile-details {
   border-top: 1px solid #ebebeb;
   padding-top: 24px;
   margin-bottom: 32px;
   text-align: left;
+} */
+
+.profile-details {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.profile-label {
+  width: 220px;
+  min-width: 220px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  text-align: left;
+}
+
+.profile-value {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 500;
+  color: #4b5563;
+  text-align: left;
+  word-break: break-word;
 }
 
 .detail-item {
@@ -169,9 +200,9 @@
   width: 100%;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #222;
-  background: white;
-  color: #222;
+  border: 1px ;
+  background: #ff385c;
+  color: #efe8e8;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -179,18 +210,18 @@
 }
 
 .edit-profile-btn:hover {
-  background: #f7f7f7;
+  background: #e11d48;
 }
 
 /* Back to Home button */
-.profile-back-btn {
+/* .profile-back-btn {
   align-self: flex-end;
   display: inline-flex;
   align-self: flex-end;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 14px;
+  padding: 7px 10px;
   border-radius: 999px;
   border: 1px solid #ddd;
   background: white;
@@ -202,14 +233,36 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
   width: fit-content;
   max-width: unset;
+} */
+.profile-back-btn {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 12px 20px; /* bigger spacing */
+  border-radius: 10px; /* rectangle (not pill) */
+
+  border: none;
+  background: #ff385c; /* soft pink */
+  color: #fcfafa; /* deep pink text */
+
+  font-size: 15px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow: 0 4px 10px rgba(255, 56, 92, 0.15);
+
+  width: fit-content;
 }
 
-.profile-back-btn:hover {
+/* .profile-back-btn:hover {
   background: #fff0f3;
   color: #ff385c;
   border-color: #ff385c;
   box-shadow: 0 2px 8px rgba(255, 56, 92, 0.12);
-}
+} */
 
 /* My Listings Section */
 .profile-grid {
@@ -305,7 +358,7 @@
   border-radius: 8px;
   border: 1px solid #222;
   background: white;
-  color: #222;
+  color: #ece8e8;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -383,9 +436,9 @@
   transition: border 0.2s;
 }
 
-.profile-input:focus {
-  border-color: #4f46e5;
-}
+/* .profile-input:focus {
+  border-color: #ebebf0;
+} */
 
 .profile-btn-group {
   display: flex;
@@ -394,7 +447,7 @@
 }
 
 .save-profile-btn {
-  background-color: #4f46e5;
+  background-color: #ff385c;
   color: white;
   padding: 10px 24px;
   border: none;
@@ -403,8 +456,8 @@
 }
 
 .cancel-profile-btn {
-  background-color: #e5e7eb;
-  color: #333;
+  background-color:#ff385c;
+  color: #f8f1f1;
   padding: 10px 24px;
   border: none;
   border-radius: 8px;

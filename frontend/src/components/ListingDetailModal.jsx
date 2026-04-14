@@ -470,28 +470,89 @@ const ListingDetailModal = ({
   selectedListing,
   showWishlist = true,
   showBooking = true,
-  imageFit = "cover",
+  imageFit = "contain", // FIX TODAY: use contain by default for cleaner HD viewing
   mode = "default",
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
 
   useEffect(() => {
     if (isOpen && selectedListing) {
       setCurrentImageIndex(0);
+      setImageErrors({});
     }
   }, [isOpen, selectedListing]);
 
-  const images = useMemo(() => selectedListing?.images || [], [selectedListing]);
+  // FIX TODAY: normalize backend image objects and plain strings into clean URLs
+  const normalizeImageUrl = (img) => {
+    if (!img) return "";
+
+    let rawValue = "";
+
+    if (typeof img === "string") {
+      rawValue = img;
+    } else if (typeof img === "object") {
+      rawValue = img.image || img.url || "";
+    }
+
+    if (!rawValue) return "";
+
+    if (
+      rawValue.startsWith("http://") ||
+      rawValue.startsWith("https://") ||
+      rawValue.startsWith("blob:")
+    ) {
+      return rawValue;
+    }
+
+    return `${API_BASE}${rawValue}`;
+  };
+
+  // FIX TODAY: support selectedListing.images as array of objects OR strings
+  const images = useMemo(() => {
+    const rawImages = Array.isArray(selectedListing?.images)
+      ? selectedListing.images
+      : [];
+
+    const normalizedImages = rawImages
+      .map((img) => normalizeImageUrl(img))
+      .filter(Boolean);
+
+    if (normalizedImages.length > 0) {
+      return [...new Set(normalizedImages)];
+    }
+
+    const fallbackImages = [];
+
+    if (selectedListing?.primary_image) {
+      fallbackImages.push(normalizeImageUrl(selectedListing.primary_image));
+    }
+
+    if (Array.isArray(selectedListing?.all_images)) {
+      selectedListing.all_images.forEach((img) => {
+        const normalized = normalizeImageUrl(img);
+        if (normalized) fallbackImages.push(normalized);
+      });
+    }
+
+    return [...new Set(fallbackImages)];
+  }, [selectedListing]);
+
+  // FIX TODAY: only show images that did not fail
+  const validImages = useMemo(() => {
+    return images.filter((img) => !imageErrors[img]);
+  }, [images, imageErrors]);
+
+  useEffect(() => {
+    if (currentImageIndex >= validImages.length && validImages.length > 0) {
+      setCurrentImageIndex(0);
+    }
+  }, [currentImageIndex, validImages.length]);
 
   if (!isOpen || !selectedListing) return null;
 
-  const currentImage = images[currentImageIndex];
-  const imageSrc = currentImage
-    ? currentImage.toString().startsWith("http")
-      ? currentImage
-      : `${API_BASE}${currentImage}`
-    : null;
+  const currentImage = validImages[currentImageIndex] || null;
 
   const hostName = selectedListing.host_name || "Host";
   const createdAt = selectedListing.created_at
@@ -499,13 +560,25 @@ const ListingDetailModal = ({
     : "recent";
 
   const goPrev = () => {
-    if (!images.length) return;
-    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+    if (!validImages.length) return;
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? validImages.length - 1 : prev - 1
+    );
   };
 
   const goNext = () => {
-    if (!images.length) return;
-    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+    if (!validImages.length) return;
+    setCurrentImageIndex((prev) =>
+      prev === validImages.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleImageError = (src) => {
+    if (!src) return;
+    setImageErrors((prev) => ({
+      ...prev,
+      [src]: true,
+    }));
   };
 
   return (
@@ -524,19 +597,31 @@ const ListingDetailModal = ({
           <div className="admin-split-layout">
             <div className="admin-split-gallery">
               <div className="admin-gallery-main">
-                {images.length > 0 ? (
+                {validImages.length > 0 ? (
                   <>
-                    <div className={`admin-main-image-shell fit-${imageFit}`}>
+                    <div
+                      className={`admin-main-image-shell fit-${imageFit}`}
+                      style={{
+                        maxWidth: "100%",
+                        margin: "0 auto",
+                      }}
+                    >
                       <img
-                        src={imageSrc}
+                        src={currentImage}
                         alt={selectedListing.title}
                         className={`admin-main-image fit-${imageFit}`}
                         loading="lazy"
                         decoding="async"
+                        onError={() => handleImageError(currentImage)}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: imageFit,
+                        }}
                       />
                     </div>
 
-                    {images.length > 1 && (
+                    {validImages.length > 1 && (
                       <>
                         <button
                           className="carousel-btn carousel-prev"
@@ -562,29 +647,26 @@ const ListingDetailModal = ({
                 )}
               </div>
 
-              {images.length > 1 && (
+              {validImages.length > 1 && (
                 <div className="admin-thumb-grid">
-                  {images.map((img, idx) => {
-                    const thumbSrc = img?.toString().startsWith("http")
-                      ? img
-                      : `${API_BASE}${img}`;
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        className={`admin-thumb-card ${idx === currentImageIndex ? "active" : ""}`}
-                        onClick={() => setCurrentImageIndex(idx)}
-                      >
-                        <img
-                          src={thumbSrc}
-                          alt={`Thumbnail ${idx + 1}`}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </button>
-                    );
-                  })}
+                  {validImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`admin-thumb-card ${
+                        idx === currentImageIndex ? "active" : ""
+                      }`}
+                      onClick={() => setCurrentImageIndex(idx)}
+                    >
+                      <img
+                        src={img}
+                        alt={`Thumbnail ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => handleImageError(img)}
+                      />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -652,12 +734,25 @@ const ListingDetailModal = ({
                 <div className="admin-info-block">
                   <h4>Property Details</h4>
                   <div className="admin-details-list">
-                    <div><strong>Type:</strong> {selectedListing.property_type || "Property"}</div>
-                    <div><strong>City:</strong> {selectedListing.city || "-"}</div>
-                    <div><strong>District:</strong> {selectedListing.district || "-"}</div>
-                    <div><strong>Province:</strong> {selectedListing.province || "-"}</div>
-                    <div><strong>Region:</strong> {selectedListing.region || "-"}</div>
-                    <div><strong>Status:</strong> {selectedListing.status || "-"}</div>
+                    <div>
+                      <strong>Type:</strong>{" "}
+                      {selectedListing.property_type || "Property"}
+                    </div>
+                    <div>
+                      <strong>City:</strong> {selectedListing.city || "-"}
+                    </div>
+                    <div>
+                      <strong>District:</strong> {selectedListing.district || "-"}
+                    </div>
+                    <div>
+                      <strong>Province:</strong> {selectedListing.province || "-"}
+                    </div>
+                    <div>
+                      <strong>Region:</strong> {selectedListing.region || "-"}
+                    </div>
+                    <div>
+                      <strong>Status:</strong> {selectedListing.status || "-"}
+                    </div>
                   </div>
                 </div>
 
@@ -685,7 +780,8 @@ const ListingDetailModal = ({
                 <div className="admin-info-block">
                   <h4>Reviews</h4>
                   <p>
-                    <strong>{selectedListing.total_reviews || 0}</strong> total reviews
+                    <strong>{selectedListing.total_reviews || 0}</strong> total
+                    reviews
                   </p>
 
                   {selectedListing.approved_reviews?.length > 0 ? (
@@ -694,13 +790,17 @@ const ListingDetailModal = ({
                         <div key={review.id || idx} className="admin-review-card">
                           <div className="admin-review-head">
                             <strong>{review.reviewer_name}</strong>
-                            <span>{new Date(review.created_at).toLocaleDateString()}</span>
+                            <span>
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </span>
                           </div>
                           <div className="admin-review-stars">
                             {[...Array(5)].map((_, i) => (
                               <i
                                 key={i}
-                                className={`bi ${i < review.rating ? "bi-star-fill" : "bi-star"}`}
+                                className={`bi ${
+                                  i < review.rating ? "bi-star-fill" : "bi-star"
+                                }`}
                               ></i>
                             ))}
                           </div>
@@ -718,7 +818,7 @@ const ListingDetailModal = ({
         ) : (
           <>
             <div className="listing-detail-carousel public-carousel">
-              {images.length > 0 ? (
+              {validImages.length > 0 ? (
                 <div className="carousel-container">
                   {showWishlist && (
                     <div className="public-wishlist-wrap">
@@ -729,30 +829,52 @@ const ListingDetailModal = ({
                     </div>
                   )}
 
-                  <div className={`carousel-image-shell fit-${imageFit}`}>
+                  <div
+                    className={`carousel-image-shell fit-${imageFit}`}
+                    style={{
+                      maxWidth: "1100px",
+                      margin: "0 auto",
+                    }}
+                  >
                     <img
-                      src={imageSrc}
+                      src={currentImage}
                       alt={selectedListing.title}
                       className={`carousel-image fit-${imageFit}`}
                       loading="lazy"
                       decoding="async"
+                      onError={() => handleImageError(currentImage)}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: imageFit,
+                      }}
                     />
                   </div>
 
-                  {images.length > 1 && (
+                  {validImages.length > 1 && (
                     <>
-                      <button className="carousel-btn carousel-prev" onClick={goPrev} type="button">
+                      <button
+                        className="carousel-btn carousel-prev"
+                        onClick={goPrev}
+                        type="button"
+                      >
                         ‹
                       </button>
-                      <button className="carousel-btn carousel-next" onClick={goNext} type="button">
+                      <button
+                        className="carousel-btn carousel-next"
+                        onClick={goNext}
+                        type="button"
+                      >
                         ›
                       </button>
 
                       <div className="carousel-indicators">
-                        {images.map((_, idx) => (
+                        {validImages.map((_, idx) => (
                           <span
                             key={idx}
-                            className={`indicator ${idx === currentImageIndex ? "active" : ""}`}
+                            className={`indicator ${
+                              idx === currentImageIndex ? "active" : ""
+                            }`}
                             onClick={() => setCurrentImageIndex(idx)}
                           />
                         ))}
@@ -760,29 +882,26 @@ const ListingDetailModal = ({
                     </>
                   )}
 
-                  {images.length > 1 && (
+                  {validImages.length > 1 && (
                     <div className="carousel-thumbnails">
-                      {images.map((img, idx) => {
-                        const thumbSrc = img?.toString().startsWith("http")
-                          ? img
-                          : `${API_BASE}${img}`;
-
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            className={`carousel-thumb ${idx === currentImageIndex ? "active" : ""}`}
-                            onClick={() => setCurrentImageIndex(idx)}
-                          >
-                            <img
-                              src={thumbSrc}
-                              alt={`Thumbnail ${idx + 1}`}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          </button>
-                        );
-                      })}
+                      {validImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`carousel-thumb ${
+                            idx === currentImageIndex ? "active" : ""
+                          }`}
+                          onClick={() => setCurrentImageIndex(idx)}
+                        >
+                          <img
+                            src={img}
+                            alt={`Thumbnail ${idx + 1}`}
+                            loading="lazy"
+                            decoding="async"
+                            onError={() => handleImageError(img)}
+                          />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -795,12 +914,15 @@ const ListingDetailModal = ({
 
             <div className="listing-detail-header">
               <div className="listing-title-section">
-                <span className="category-tag">{selectedListing.category || "Property"}</span>
+                <span className="category-tag">
+                  {selectedListing.category || "Property"}
+                </span>
                 <h2>{selectedListing.title}</h2>
                 <div className="listing-meta-top">
                   <span className="location-meta">
                     <i className="bi bi-geo-alt-fill"></i>
-                    {selectedListing.address || ""}, {selectedListing.city || ""}, {selectedListing.region || ""}
+                    {selectedListing.address || ""}, {selectedListing.city || ""},{" "}
+                    {selectedListing.region || ""}
                   </span>
                 </div>
               </div>
@@ -873,7 +995,13 @@ const ListingDetailModal = ({
                       {selectedListing.approved_reviews.map((review, idx) => (
                         <div key={review.id || idx} className="listing-review-card">
                           <div className="listing-review-top">
-                            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "12px",
+                                alignItems: "center",
+                              }}
+                            >
                               <div className="host-avatar-small review-avatar">
                                 {review.reviewer_avatar ? (
                                   <img
@@ -893,7 +1021,9 @@ const ListingDetailModal = ({
                                 )}
                               </div>
                               <div>
-                                <div className="listing-review-name">{review.reviewer_name}</div>
+                                <div className="listing-review-name">
+                                  {review.reviewer_name}
+                                </div>
                                 <div className="listing-review-date">
                                   {new Date(review.created_at).toLocaleDateString()}
                                 </div>
@@ -926,7 +1056,9 @@ const ListingDetailModal = ({
                   <div className="booking-sticky-card public-booking-card">
                     <div className="booking-card-header">
                       <div className="price-tag">
-                        <span className="price">Rs. {selectedListing.price_per_night}</span>
+                        <span className="price">
+                          Rs. {selectedListing.price_per_night}
+                        </span>
                         <span className="period"> / night</span>
                       </div>
                     </div>

@@ -8,43 +8,51 @@ const ProfilePage = () => {
   const [user, setUser] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef(null);
-  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
+  const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
-
-  // jaba edit user lay click garxah current user data copy garxa into formdata maa
-  const handleEditClick = () =>{
-    setFormData ({
-         first_name: user.first_name || "",
-         last_name : user.last_name || "",
-         phone_number: user.phone_number || "",
-         city: user.city || "",
-         country: user.country || "",
-         date_of_birth: user.date_of_birth || "",
+  const handleEditClick = () => {
+    setFormData({
+      first_name: user?.first_name || "",
+      last_name: user?.last_name || "",
+      phone_number: user?.phone_number || "",
+      city: user?.city || "",
+      country: user?.country || "",
+      date_of_birth: user?.date_of_birth || "",
     });
     setIsEditing(true);
-
+    setError("");
   };
- 
+
   const handleChange = (e) => {
-    setFormData({...formData, [e.target.name]: e.target.value})
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-
-
-   const handleSave = async () => {
+  const handleSave = async () => {
     try {
-      const res = await api.patch("/auth/profile/",formData);
+      setError("");
+
+      const res = await api.patch("/auth/profile/", formData);
       setUser(res.data);
       localStorage.setItem("user", JSON.stringify(res.data));
       setIsEditing(false);
+      window.dispatchEvent(new Event("wishlistUpdate"));
     } catch (err) {
-      setError(err?.response?.data?.details || "Failed to update profile.");
+      console.error("Profile update failed:", err);
+      setError(
+        err?.response?.data?.detail ||
+          err?.response?.data?.details ||
+          "Failed to update profile."
+      );
     }
-   };
-   
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
 
@@ -74,7 +82,11 @@ const ProfilePage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "Not provided";
-    return new Date(dateString).toLocaleDateString();
+
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "Not provided";
+
+    return date.toLocaleDateString("en-GB");
   };
 
   const getInitials = () => {
@@ -95,10 +107,10 @@ const ProfilePage = () => {
     setUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("profile_image", file);
+      const imageData = new FormData();
+      imageData.append("profile_image", file);
 
-      const res = await api.patch("/auth/profile/", formData, {
+      const res = await api.patch("/auth/profile/", imageData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -106,7 +118,7 @@ const ProfilePage = () => {
 
       setUser(res.data);
       localStorage.setItem("user", JSON.stringify(res.data));
-      window.dispatchEvent(new Event("wishlistUpdate"));// navbar lai vanxa ki user ko data chnage vayo tesilay reload profile picture
+      window.dispatchEvent(new Event("wishlistUpdate"));
     } catch (err) {
       console.error("Photo upload failed:", err);
       setError(
@@ -131,8 +143,9 @@ const ProfilePage = () => {
           onClick={() => navigate("/home")}
           type="button"
         >
-          ← Back to Home
+          Back to Home
         </button>
+
         <div className="profile-card">
           <div className="profile-header">
             <div className="profile-photo-wrapper">
@@ -164,146 +177,164 @@ const ProfilePage = () => {
               />
             </div>
 
-            <h1>
-              {user.first_name || "First Name"} {user.last_name || "Last Name"}
-            </h1>
-            <p className="profile-email">{user.email || "No email found"}</p>
+            <div className="profile-header-info">
+              <h1>
+                {user.first_name || "First Name"} {user.last_name || "Last Name"}
+              </h1>
+              <p className="profile-email">{user.email || "No email found"}</p>
+            </div>
           </div>
 
           {error && <p className="profile-error">{error}</p>}
 
           <div className="profile-details">
-            <div className="detail-item">
-              <label>First Name</label>
-              {isEditing ? (
-                <input
-                 name ="first_name"
-                value= {formData.first_name}
-                onChange={handleChange}
-                className="profile-input"
-              />
-              ) :(
-
-              <span>{user.first_name || "Not provided"}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>Last Name</label>
-               {isEditing ? (
-                <input
-                 name ="last_name"
-                value= {formData.last_name}
-                onChange={handleChange}
-                className="profile-input"
-              />
-              ) :(
-              <span>{user.last_name || "Not provided"}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>Email</label>
-              <span>{user.email || "Not provided"}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Phone Number</label>
-              {isEditing ? (
-                <input
-                 name ="phone_number"
-                value= {formData.phone_number || ""}
-                onChange={handleChange}
-                className="profile-input"
-              />
-              ) :(
-              <span>{user.phone_number || "Not provided"}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>Date of Birth</label>
-              {isEditing ? (
-                <input
-                 type="date"
-                 name ="date_of_birth"
-                 value= {formData.date_of_birth}
-                 onChange={handleChange}
-                 className="profile-input"
-              />
-              ) :(
-              <span>{formatDate(user.date_of_birth)}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>City</label>
-              {isEditing ? (
-                <input
-                 name ="city"
-                value= {formData.city}
-                onChange={handleChange}
-                className="profile-input"
-              />
-              ) :(
-              <span>{user.city || "Not provided"}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>Country</label>
-              {isEditing ? (
-                <input
-                 name ="country"
-                value= {formData.country}
-                onChange={handleChange}
-                className="profile-input"
-              />
-              ) :(
-              <span>{user.country || "Not provided"}</span>
-              )}
-            </div>
-
-            <div className="detail-item">
-              <label>Account Type</label>
-              <span>{user.is_host ? "Host" : "Guest"}</span>
-            </div>
-
-            {!user.is_host && (
-              <div className="detail-item">
-                <label>Host Status</label>
-                <span
-                  className={`status-badge status-${
-                    user.host_application_status || "none"
-                  }`}
-                >
-                  {user.host_application_status === "pending"
-                    ? "Pending"
-                    : user.host_application_status === "approved"
-                    ? "Approved"
-                    : user.host_application_status === "rejected"
-                    ? "Rejected"
-                    : "Not Applied"}
-                </span>
+            <div className="profile-row">
+              <div className="profile-label">First Name</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={formData.first_name || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  user.first_name || "Not provided"
+                )}
               </div>
-            )}
+            </div>
 
-            <div className="detail-item">
-              <label>Status</label>
-              <span className="status-badge active">Active</span>
+            <div className="profile-row">
+              <div className="profile-label">Last Name</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={formData.last_name || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  user.last_name || "Not provided"
+                )}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">Email</div>
+              <div className="profile-value">
+                {user.email || "Not provided"}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">Phone Number</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="phone_number"
+                    value={formData.phone_number || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  user.phone_number || "Not provided"
+                )}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">Date of Birth</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={formData.date_of_birth || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  formatDate(user.date_of_birth)
+                )}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">City</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  user.city || "Not provided"
+                )}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">Country</div>
+              <div className="profile-value">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="country"
+                    value={formData.country || ""}
+                    onChange={handleChange}
+                    className="profile-input"
+                  />
+                ) : (
+                  user.country || "Not provided"
+                )}
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-label">Account Type</div>
+              <div className="profile-value">
+                {user.is_host ? "Host" : "Guest"}
+              </div>
             </div>
           </div>
-          {isEditing ?  (
-            <div className="profile-btn-group">
-              <button className="save-profile-btn" onClick={handleSave}>Save Change</button>
-            
-            <button className="cancel-profile-btn" onClick={() => setIsEditing(false)}>Cancel</button>
 
-          </div>
-          ):(
-            <button className="edit-profile-btn" onClick={handleEditClick}>Edit Profile</button>
+          {isEditing ? (
+            <div className="profile-btn-group">
+              <button
+                className="save-profile-btn"
+                onClick={handleSave}
+                type="button"
+              >
+                Save Changes
+              </button>
+
+              <button
+                className="cancel-profile-btn"
+                onClick={() => {
+                  setIsEditing(false);
+                  setError("");
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              className="edit-profile-btn"
+              onClick={handleEditClick}
+              type="button"
+            >
+              Edit Profile
+            </button>
           )}
-          
         </div>
       </main>
     </div>

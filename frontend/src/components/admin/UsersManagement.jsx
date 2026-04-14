@@ -293,7 +293,7 @@ const UsersManagement = () => {
                                                         className={`btn ${user.is_active ? 'btn-warning' : 'btn-success'}`}
                                                         title={user.is_active ? 'Deactivate' : 'Activate'}
                                                     >
-                                                        {user.is_active ? 'OFF' : 'ON'}
+                                                        {user.is_active ? 'Deactive' : 'Active'}
                                                     </button>
 
                                                     {currentUser?.is_superuser && (

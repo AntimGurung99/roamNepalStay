@@ -18,10 +18,31 @@ import HostDashboard from "./pages/HostDashboard";
 import CheckoutPage from "./pages/CheckoutPage";
 import Footer from "./components/Footer";
 import ExploreMapPage from "./pages/ExploreMapPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import HostBookingDetails from "./pages/HostBookingDetails";
+import AboutPage from "./pages/AboutPage";
+import CategoryResultsPage from "./pages/CategoryResultsPage";
+
+
+//for footer
+import TravelBlogPage from "./pages/TravelBlogPage";
+import PartnersPage from "./pages/PartnersPage";
+import CareersPage from "./pages/CareersPage";
+import ContactPage from "./pages/ContactPage";
+import HelpCenterPage from "./pages/HelpCenterPage";
+import FAQsPage from "./pages/FAQsPage";
+import BookingPolicyPage from "./pages/BookingPolicyPage";
+import CancellationPolicyPage from "./pages/CancellationPolicyPage";
+import CustomerSupportPage from "./pages/CustomerSupportPage";
+
+
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import RefundPolicyPage from "./pages/RefundPolicyPage";
 
 function App() {
   const location = useLocation();
@@ -31,10 +52,14 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/categories/:slug" element={<CategoryResultsPage />} />
         <Route path="/explore-map" element={<ExploreMapPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/wishlist" element={<WishlistPage />} />
@@ -67,6 +92,20 @@ function App() {
           element={<PaymentFailed />}
         />
         <Route path="/checkout/:listingId" element={<CheckoutPage />} />
+
+        <Route path="/travel-blog" element={<TravelBlogPage />} />
+        <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/careers" element={<CareersPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/help-center" element={<HelpCenterPage />} />
+        <Route path="/faqs" element={<FAQsPage />} />
+        <Route path="/booking-policy" element={<BookingPolicyPage />} />
+        <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+        <Route path="/customer-support" element={<CustomerSupportPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
+
        
       </Routes>
 
@@ -91,6 +130,8 @@ function App() {
           "/wishlist",
           "/my-properties",
           "/explore-map",
+          "/forgot-password",
+          "/reset-password",
 
         ].includes(location.pathname) &&
         !location.pathname.startsWith("/checkout") && <Footer />}

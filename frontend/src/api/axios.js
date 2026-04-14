@@ -45,10 +45,18 @@ export const reviewsAPI = {
     API.post(`/bookings/${bookingId}/review/`, data),
 };
 
+// export const listingsAPI = {
+//   getListing: (id) => API.get(`/listings/${id}/`),
+//   getBookedDates: (id) => API.get(`/listings/${id}/booked_dates/`),
+//   getMapListings: (params) => API.get("/listings/map/", { params }),
+// };
+
 export const listingsAPI = {
   getListing: (id) => API.get(`/listings/${id}/`),
   getBookedDates: (id) => API.get(`/listings/${id}/booked_dates/`),
   getMapListings: (params) => API.get("/listings/map/", { params }),
+  getCategories: () => API.get("/listings/categories/"),
+  getListings: (params = {}) => API.get("/listings/", { params }),
 };
 
 export const platformSettingsAPI = {

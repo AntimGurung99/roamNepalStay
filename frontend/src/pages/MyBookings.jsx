@@ -14,6 +14,7 @@ import {
 import { bookingsAPI, paymentsAPI, reviewsAPI } from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/MyBookings.css";
+import Navbar from "../components/Navbar.jsx";
 
 // Helper Functions Moved Outside
 const formatDate = (date) => {
@@ -476,6 +477,8 @@ const MyBookings = () => {
   if (loading) return <div className="center">Loading...</div>;
 
   return (
+    <>
+        <Navbar />
     <div className="bookings-page">
       <div className="bookings-header-flex">
         <h1 className="page-title">My Bookings</h1>
@@ -510,6 +513,7 @@ const MyBookings = () => {
         ))
       )}
     </div>
+    </>
   );
 };
 

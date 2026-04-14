@@ -41,7 +41,7 @@ export default function Footer() {
           <div className="rns-footer-col">
             <h3>Company</h3>
             <a href="/about">About Us</a>
-            <a href="/blog">Travel Blog</a>
+            <a href="/travel-blog">Travel Blog</a>
             <a href="/partners">Partners</a>
             <a href="/careers">Careers</a>
             <a href="/contact">Contact</a>
@@ -50,10 +50,10 @@ export default function Footer() {
           <div className="rns-footer-col">
             <h3>Support</h3>
             <a href="/help-center">Help Center</a>
-            <a href="/faq">FAQs</a>
+            <a href="/faqs">FAQs</a>
             <a href="/booking-policy">Booking Policy</a>
             <a href="/cancellation-policy">Cancellation Policy</a>
-            <a href="/support">Customer Support</a>
+            <a href="/customer-support">Customer Support</a>
           </div>
         </div>
       </div>
@@ -70,7 +70,7 @@ export default function Footer() {
 
         <div className="rns-socials">
           <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
-          <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
+          <a href="https://www.instagram.com/antimgurunq/" target="_blank" rel="noreferrer">Instagram</a>
           <a href="https://youtube.com" target="_blank" rel="noreferrer">YouTube</a>
           <a href="https://tiktok.com" target="_blank" rel="noreferrer">TikTok</a>
         </div>

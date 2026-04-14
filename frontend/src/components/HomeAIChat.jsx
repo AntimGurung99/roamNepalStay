@@ -66,35 +66,8 @@ const HomeAIChat = () => {
               Ask me where you should go in Nepal.
             </p>
 
-            {/* Quick Suggestions */}
-            <div className="ai-chip-row">
-              <button
-                onClick={() => {
-                  setMessage("I want a peaceful getaway");
-                  setReply("");
-                }}
-              >
-                Peaceful getaway
-              </button>
 
-              <button
-                onClick={() => {
-                  setMessage("Suggest a mountain view place");
-                  setReply("");
-                }}
-              >
-                Mountain view
-              </button>
-
-              <button
-                onClick={() => {
-                  setMessage("I want a jungle stay");
-                  setReply("");
-                }}
-              >
-                Jungle stay
-              </button>
-            </div>
+          
 
             {/* Input */}
             <textarea

@@ -116,9 +116,9 @@
 }
 
 .carousel-image-shell {
-  width: 100%;
+  width: 300%;
   aspect-ratio: 16 / 9;
-  max-height: 560px;
+  max-height: 500px;
   border-radius: 18px;
   overflow: hidden;
   background: #eef1f4;

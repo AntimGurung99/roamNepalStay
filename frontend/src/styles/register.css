@@ -223,7 +223,7 @@ body {
   border-radius: 12px;
   background: #FF3B5C;
   color: #fff;
-  font-weight: 700;
+  font-weight: 900;
   cursor: pointer;
   letter-spacing: 0.4px;
   transition: 0.25s ease;
@@ -290,3 +290,4 @@ body {
   font-size: 16px;
   opacity: 0.9;
 }
+
