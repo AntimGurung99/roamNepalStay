@@ -444,7 +444,13 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(PlatformSetting)
 class PlatformSettingAdmin(admin.ModelAdmin):
-    list_display = ("site_name", "service_fee_percent", "updated_at")
+    list_display = (
+        "site_name",
+        "fee_0_to_2000_percent",
+        "fee_2001_to_6000_percent",
+        "fee_6001_and_above_percent",
+        "updated_at",
+    )
 
     def has_add_permission(self, request):
         return not PlatformSetting.objects.exists()

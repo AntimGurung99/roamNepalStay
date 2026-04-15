@@ -28,6 +28,21 @@ def send_otp_email(user):
     )
 
 
+def send_reset_password_otp_email(user):
+    otp = generate_otp()
+    user.reset_password_otp = otp
+    user.reset_password_otp_created_at = timezone.now()
+    user.save(update_fields=["reset_password_otp", "reset_password_otp_created_at"])
+
+    send_mail(
+        subject="RoamNepalStay - Password Reset OTP",
+        message=f"Your password reset OTP is: {otp}\nThis code expires in 10 minutes.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
 def send_booking_confirmation_emails(booking):
     try:
         listing = booking.listing

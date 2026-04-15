@@ -15,6 +15,8 @@ from .views import (
     # UserProfileView,
     VerifyOTPAPIView,
     ResendOTPAPIView,
+    ForgotPasswordAPIView,
+    ResetPasswordAPIView,
     # for booking
     BookingsDetailsView,
     HostBookingViewSet,
@@ -67,6 +69,10 @@ urlpatterns = [
     # Authentication routes
     path("auth/register/", RegisterAPIView.as_view(), name="register"),
     path("auth/login/", LoginAPIView.as_view(), name="login"),
+    path(
+        "auth/forgot-password/", ForgotPasswordAPIView.as_view(), name="forgot-password"
+    ),
+    path("auth/reset-password/", ResetPasswordAPIView.as_view(), name="reset-password"),
     path("auth/profile/", ProfileAPIView.as_view(), name="profile"),
     # Host Application
     path(

@@ -77,6 +77,10 @@ class User(AbstractUser):
     email_otp = models.CharField(max_length=6, blank=True, null=True)
     otp_created_at = models.DateTimeField(blank=True, null=True)
 
+    # Password reset OTP
+    reset_password_otp = models.CharField(max_length=6, blank=True, null=True)
+    reset_password_otp_created_at = models.DateTimeField(blank=True, null=True)
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
@@ -672,16 +676,41 @@ class Notification(models.Model):
 
 class PlatformSetting(models.Model):
     site_name = models.CharField(max_length=100, default="RoamNepalStay")
-    service_fee_percent = models.DecimalField(
+
+    fee_0_to_2000_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=6.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+
+    fee_2001_to_6000_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=5.00,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
+
+    fee_6001_and_above_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=4.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return "Platform Settings"
+
+    def get_fee_percent_for_price(self, price):
+        price = Decimal(price or 0)
+
+        if price <= Decimal("2000"):
+            return self.fee_0_to_2000_percent or Decimal("0.00")
+        elif price <= Decimal("6000"):
+            return self.fee_2001_to_6000_percent or Decimal("0.00")
+        return self.fee_6001_and_above_percent or Decimal("0.00")
 
     @classmethod
     def get_settings(cls):
@@ -689,7 +718,9 @@ class PlatformSetting(models.Model):
             id=1,
             defaults={
                 "site_name": "RoamNepalStay",
-                "service_fee_percent": Decimal("5.00"),
+                "fee_0_to_2000_percent": Decimal("6.00"),
+                "fee_2001_to_6000_percent": Decimal("5.00"),
+                "fee_6001_and_above_percent": Decimal("4.00"),
             },
         )
         return obj

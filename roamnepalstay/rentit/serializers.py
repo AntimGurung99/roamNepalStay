@@ -127,6 +127,46 @@ class RegisterResponseSerializer(serializers.ModelSerializer):
     )
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    otp = serializers.CharField(required=True, min_length=6, max_length=6)
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email = (attrs.get("email") or "").strip().lower()
+        otp = (attrs.get("otp") or "").strip()
+        password = attrs.get("password")
+        confirm_password = attrs.get("confirm_password")
+
+        if not email:
+            raise serializers.ValidationError({"email": ["Email is required."]})
+
+        if not otp or len(otp) != 6 or not otp.isdigit():
+            raise serializers.ValidationError({"otp": ["OTP must be 6 digits."]})
+
+        if password != confirm_password:
+            raise serializers.ValidationError(
+                {"confirm_password": ["Passwords do not match."]}
+            )
+
+        try:
+            validate_password(password)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"password": e.messages})
+
+        attrs["email"] = email
+        attrs["otp"] = otp
+        return attrs
+
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
@@ -617,11 +657,13 @@ class ListingListSerializer(serializers.ModelSerializer):
 #             "pet_allowed",
 #         ]
 #         return [field for field in amenity_fields if getattr(obj, field, False)]
+
+
 class ListingDetailSerializer(serializers.ModelSerializer):
     host_name = serializers.SerializerMethodField()
     host_phone = serializers.CharField(source="host.phone_number", read_only=True)
     host_email = serializers.EmailField(source="host.email", read_only=True)
-    images = serializers.SerializerMethodField()
+    images = ListingImageSerializer(many=True, read_only=True)
     average_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
     approved_reviews = serializers.SerializerMethodField()
@@ -634,22 +676,25 @@ class ListingDetailSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "highlight",
+            "highlight_details",
             "category",
             "property_type",
             "province",
             "district",
             "region",
             "city",
+            "country",
             "address",
             "latitude",
             "longitude",
             "price_per_night",
+            "cleaning_fee",
             "bedrooms",
             "beds",
             "bathrooms",
             "max_guests",
             "amenities",
-            "highlight",
             "status",
             "created_at",
             "updated_at",
@@ -666,19 +711,6 @@ class ListingDetailSerializer(serializers.ModelSerializer):
     def get_host_name(self, obj):
         full_name = f"{obj.host.first_name} {obj.host.last_name}".strip()
         return full_name if full_name else obj.host.email
-
-    def get_images(self, obj):
-        request = self.context.get("request")
-        images = obj.images.all().order_by("-is_primary", "id")
-        image_urls = []
-
-        for image in images:
-            if request:
-                image_urls.append(request.build_absolute_uri(image.image.url))
-            else:
-                image_urls.append(image.image.url)
-
-        return image_urls
 
     def get_average_rating(self, obj):
         approved_reviews = obj.reviews.filter(is_approved=True)
@@ -705,7 +737,6 @@ class ListingDetailSerializer(serializers.ModelSerializer):
         return False
 
     def get_amenities(self, obj):
-        """Return list of enabled amenities"""
         amenity_fields = [
             "wifi",
             "parking",
@@ -765,10 +796,19 @@ class BookingListSerializer(serializers.ModelSerializer):
             "payment_method",
         ]
 
+    # def get_listing_image(self, obj):
+    #     primary_image = obj.listing.images.filter(is_primary=True).first()
+    #     if primary_image:
+    #         return primary_image.image.url
+    #     return None
+
     def get_listing_image(self, obj):
-        primary_image = obj.listing.images.filter(is_primary=True).first()
-        if primary_image:
-            return primary_image.image.url
+        request = self.context.get("request")
+        first_image = obj.listing.images.first()
+        if first_image and first_image.image:
+            if request:
+                return request.build_absolute_uri(first_image.image.url)
+            return first_image.image.url
         return None
 
     def get_guest_name(self, obj):
@@ -821,6 +861,20 @@ class AdminReviewListSerializer(serializers.ModelSerializer):
 
 
 # admin dashboard ko stats dekhauna ko lagi
+# class AdminStatsSerializer(serializers.Serializer):
+#     total_users = serializers.IntegerField()
+#     total_hosts = serializers.IntegerField()
+#     total_listings = serializers.IntegerField()
+#     total_bookings = serializers.IntegerField()
+#     pending_host_applications = serializers.IntegerField()
+#     pending_listings = serializers.IntegerField()
+#     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+#     recent_bookings = BookingListSerializer(many=True)
+#     recent_reviews = AdminReviewListSerializer(many=True)
+#     monthly_bookings = serializers.JSONField()
+#     monthly_revenue = serializers.JSONField()
+#     listings_by_type = serializers.JSONField()
+#     host_application_status = serializers.JSONField()
 class AdminStatsSerializer(serializers.Serializer):
     total_users = serializers.IntegerField()
     total_hosts = serializers.IntegerField()
@@ -835,6 +889,11 @@ class AdminStatsSerializer(serializers.Serializer):
     monthly_revenue = serializers.JSONField()
     listings_by_type = serializers.JSONField()
     host_application_status = serializers.JSONField()
+    selected_period = serializers.CharField(required=False)
+    selected_city = serializers.CharField(required=False)
+    available_cities = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
 
 
 # class ListingCreateSerializer(serializers.ModelSerializer):
@@ -1155,8 +1214,16 @@ class BookingDetailSerializer(serializers.ModelSerializer):
     listing_title = serializers.CharField(source="listing.title", read_only=True)
     listing_image = serializers.SerializerMethodField()
     listing_city = serializers.CharField(source="listing.city", read_only=True)
+    listing_district = serializers.CharField(source="listing.district", read_only=True)
+    listing_country = serializers.CharField(source="listing.country", read_only=True)
+    listing_address = serializers.CharField(source="listing.address", read_only=True)
     guest_name = serializers.SerializerMethodField()
+    guest_email = serializers.EmailField(source="guest.email", read_only=True)
+    guest_phone = serializers.CharField(source="guest.phone_number", read_only=True)
+    guest_city = serializers.CharField(source="guest.city", read_only=True)
+    guest_country = serializers.CharField(source="guest.country", read_only=True)
     host_name = serializers.SerializerMethodField()
+    host_email = serializers.EmailField(source="listing.host.email", read_only=True)
     host_id = serializers.IntegerField(source="listing.host.id", read_only=True)
     total_nights = serializers.ReadOnlyField()
     can_review = serializers.SerializerMethodField()
@@ -1202,6 +1269,14 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "total_amount",
             "host_payout",
             "superadmin_revenue",
+            "listing_district",
+            "listing_country",
+            "listing_address",
+            "guest_email",
+            "guest_phone",
+            "guest_city",
+            "guest_country",
+            "host_email",
         ]
 
     def get_listing_image(self, obj):
@@ -1315,7 +1390,13 @@ class PublicReviewSerializer(serializers.ModelSerializer):
 class PlatformSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformSetting
-        fields = ["site_name", "service_fee_percent", "updated_at"]
+        fields = [
+            "site_name",
+            "fee_0_to_2000_percent",
+            "fee_2001_to_6000_percent",
+            "fee_6001_and_above_percent",
+            "updated_at",
+        ]
 
 
 class ListingMapSerializer(serializers.ModelSerializer):

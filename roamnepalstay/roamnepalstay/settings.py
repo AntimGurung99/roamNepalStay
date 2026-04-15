@@ -150,7 +150,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    "PAGE_SIZE": 6,
 }
 
 # JWT Settings - JWT token ko configuration
@@ -276,3 +276,7 @@ ESEWA_STATUS_CHECK_URL = os.getenv(
     "ESEWA_STATUS_CHECK_URL",
     "https://rc.esewa.com.np/api/epay/transaction/status/",
 )
+
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
