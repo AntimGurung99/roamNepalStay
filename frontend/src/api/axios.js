@@ -4,13 +4,16 @@ const API = axios.create({
   baseURL: "http://127.0.0.1:8000/api",
 });
 
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access"); // antim added
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export const bookingsAPI = {
   createBooking: (data) => API.post("/bookings/", data),
@@ -44,12 +47,6 @@ export const reviewsAPI = {
   createReview: (bookingId, data) =>
     API.post(`/bookings/${bookingId}/review/`, data),
 };
-
-// export const listingsAPI = {
-//   getListing: (id) => API.get(`/listings/${id}/`),
-//   getBookedDates: (id) => API.get(`/listings/${id}/booked_dates/`),
-//   getMapListings: (params) => API.get("/listings/map/", { params }),
-// };
 
 export const listingsAPI = {
   getListing: (id) => API.get(`/listings/${id}/`),

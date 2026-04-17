@@ -614,4 +614,5 @@ const AdminCharts = ({
   );
 };
 
-export default AdminCharts;
+// today added: Memoizing charts to avoid performance bottlenecks
+export default React.memo(AdminCharts);

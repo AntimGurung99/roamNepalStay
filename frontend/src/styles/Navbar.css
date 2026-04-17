@@ -257,3 +257,31 @@
     font-size: 13px;
   }
 }
+
+
+/* POPUP MESSAGE */
+.popup-message {
+  position: fixed;
+  top: 90px;
+  right: 20px;
+  background: #ff6b81;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

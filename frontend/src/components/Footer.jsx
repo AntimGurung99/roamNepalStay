@@ -62,10 +62,10 @@ export default function Footer() {
         <div className="rns-newsletter">
           <h3>Get travel updates</h3>
           <p>Find stay deals, destination tips, and special offers from Nepal.</p>
-          <form className="rns-newsletter-form">
+          {/* <form className="rns-newsletter-form">
             <input type="email" placeholder="Enter your email" />
             <button type="submit">Subscribe</button>
-          </form>
+          </form> */}
         </div>
 
         <div className="rns-socials">

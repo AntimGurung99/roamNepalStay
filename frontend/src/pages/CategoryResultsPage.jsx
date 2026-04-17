@@ -289,7 +289,7 @@ export default function CategoryResultsPage() {
         </div>
       </div>
 
-      <Footer />
+    
     </>
   );
 }

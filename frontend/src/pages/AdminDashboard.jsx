@@ -320,6 +320,14 @@ import NotificationBell from "../components/NotificationBell";
 import logo from "../assets/mainlogo.jpg";
 import { MdStar } from "react-icons/md";
 
+// today added: Memoizing management components to prevent performance "jamming"
+const UsersManagementMemo = React.memo(UsersManagement);
+const HostApplicationsManagementMemo = React.memo(HostApplicationsManagement);
+const ListingsManagementMemo = React.memo(ListingsManagement);
+const BookingsManagementMemo = React.memo(BookingsManagement);
+const ReviewsManagementMemo = React.memo(ReviewsManagement);
+const PlatformSettingsManagementMemo = React.memo(PlatformSettingsManagement);
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -356,7 +364,7 @@ const AdminDashboard = () => {
 }, [navigate])
 
 
-const fetchDashboardStats = async (
+const fetchDashboardStats = React.useCallback(async ( // today added
   period = chartPeriod,
   city = selectedCity,
   isFilterChange = false
@@ -405,7 +413,7 @@ const fetchDashboardStats = async (
       setLoading(false);
     }
   }
-};
+}, [chartPeriod, selectedCity]); // today added
 
 const handlePeriodChange = (newPeriod) => {
   setChartPeriod(newPeriod);
@@ -554,7 +562,7 @@ const handleCityChange = (newCity) => {
         <main className="admin-main-content">
           {/* {activeTab === "dashboard" && <DashboardOverview stats={stats} />} */}
           {activeTab === "dashboard" && (
-            <DashboardOverview
+            <DashboardOverviewMemo
               stats={stats}
               chartPeriod={chartPeriod}
               selectedCity={selectedCity}
@@ -563,21 +571,21 @@ const handleCityChange = (newCity) => {
               onCityChange={handleCityChange}
             />
           )}
-          {activeTab === "users" && <UsersManagement />}
+          {activeTab === "users" && <UsersManagementMemo />}
           {activeTab === "host-applications" && (
-            <HostApplicationsManagement onActionComplete={fetchDashboardStats} />
+            <HostApplicationsManagementMemo onActionComplete={fetchDashboardStats} />
           )}
           {activeTab === "listings" && (
-            <ListingsManagement onActionComplete={fetchDashboardStats} />
+            <ListingsManagementMemo onActionComplete={fetchDashboardStats} />
           )}
           {activeTab === "bookings" && (
-            <BookingsManagement onActionComplete={fetchDashboardStats} />
+            <BookingsManagementMemo onActionComplete={fetchDashboardStats} />
           )}
           {activeTab === "reviews" && (
-            <ReviewsManagement onActionComplete={fetchDashboardStats} />
+            <ReviewsManagementMemo onActionComplete={fetchDashboardStats} />
           )}
           {activeTab === "settings" && user?.is_superuser && (
-            <PlatformSettingsManagement />
+            <PlatformSettingsManagementMemo />
           )}
         </main>
       </div>
@@ -713,5 +721,8 @@ const DashboardOverview = ({
     </div>
   );
 };
+
+// today added: Memoizing the heavy dashboard overview
+const DashboardOverviewMemo = React.memo(DashboardOverview);
 
 export default AdminDashboard;

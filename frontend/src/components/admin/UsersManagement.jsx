@@ -469,4 +469,5 @@ const UsersManagement = () => {
     );
 };
 
-export default UsersManagement;
+// today added: Memoizing component to prevent performance bottlenecks
+export default React.memo(UsersManagement);
