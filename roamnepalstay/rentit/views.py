@@ -1370,6 +1370,199 @@ class AdminReviewViewSet(GenericViewSet):
             )
 
 
+# class HostApplicationCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         try:
+#             application = HostApplication.objects.get(user=request.user)
+#             serializer = HostApplicationSerializer(
+#                 application, context={"request": request}
+#             )
+#             return Response(serializer.data)
+#         except HostApplication.DoesNotExist:
+#             return Response(
+#                 {"detail": "Host application not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#     def post(self, request):
+#         if request.user.host_application_status in ["pending", "approved"]:
+#             return Response(
+#                 {"detail": "You already have an active application."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         try:
+#             application = HostApplication.objects.get(user=request.user)
+#             serializer = HostApplicationSerializer(
+#                 application,
+#                 data=request.data,
+#                 partial=True,
+#                 context={"request": request},
+#             )
+#             is_update = True
+#         except HostApplication.DoesNotExist:
+#             serializer = HostApplicationSerializer(
+#                 data=request.data,
+#                 context={"request": request},
+#             )
+#             is_update = False
+
+#         if serializer.is_valid():
+#             serializer.save()
+
+#             request.user.host_application_status = "pending"
+#             request.user.save(update_fields=["host_application_status"])
+
+#             application = HostApplication.objects.get(user=request.user)
+
+#             if is_update:
+#                 notify_admins(
+#                     type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
+#                     title="Host application updated",
+#                     message=f"{request.user.first_name} {request.user.last_name} updated their host application.",
+#                     actor=request.user,
+#                     priority=Notification.Priority.HIGH,
+#                     data={
+#                         "application_id": application.id,
+#                         "url": "/admin",
+#                     },
+#                     expires_in_days=30,
+#                 )
+#             else:
+#                 create_notification(
+#                     recipient=request.user,
+#                     type=Notification.Type.HOST_APPLICATION_SUBMITTED,
+#                     title="Application submitted",
+#                     message="Your host application has been submitted and is now under review.",
+#                     actor=request.user,
+#                     priority=Notification.Priority.MEDIUM,
+#                     data={
+#                         "application_id": application.id,
+#                         "url": "/profile",
+#                     },
+#                     expires_in_days=7,
+#                 )
+
+#                 notify_admins(
+#                     type=Notification.Type.ADMIN_NEW_HOST_APPLICATION,
+#                     title="New host application",
+#                     message=f"{request.user.first_name} {request.user.last_name} submitted a new host application.",
+#                     actor=request.user,
+#                     priority=Notification.Priority.HIGH,
+#                     data={
+#                         "application_id": application.id,
+#                         "url": "/admin",
+#                     },
+#                     expires_in_days=30,
+#                 )
+
+#                 return Response(
+#                     serializer.data,
+#                     status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
+#                 )
+
+
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class HostApplicationCreateView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         try:
+#             application = HostApplication.objects.get(user=request.user)
+#             serializer = HostApplicationSerializer(
+#                 application, context={"request": request}
+#             )
+#             return Response(serializer.data)
+#         except HostApplication.DoesNotExist:
+#             return Response(
+#                 {"detail": "Host application not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#     def post(self, request):
+#         try:
+#             application = HostApplication.objects.get(user=request.user)
+
+#             # Block only approved users from submitting again
+#             if request.user.host_application_status == "approved":
+#                 return Response(
+#                     {"detail": "Your host application is already approved."},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             serializer = HostApplicationSerializer(
+#                 application,
+#                 data=request.data,
+#                 partial=True,
+#                 context={"request": request},
+#             )
+#             is_update = True
+
+#         except HostApplication.DoesNotExist:
+#             serializer = HostApplicationSerializer(
+#                 data=request.data,
+#                 context={"request": request},
+#             )
+#             is_update = False
+
+#         if not serializer.is_valid():
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#         serializer.save()
+
+#         request.user.host_application_status = "pending"
+#         request.user.save(update_fields=["host_application_status"])
+
+#         application = HostApplication.objects.get(user=request.user)
+
+#         if is_update:
+#             notify_admins(
+#                 type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
+#                 title="Host application updated",
+#                 message=f"{request.user.first_name} {request.user.last_name} updated their host application.",
+#                 actor=request.user,
+#                 priority=Notification.Priority.HIGH,
+#                 data={
+#                     "application_id": application.id,
+#                     "url": "/admin",
+#                 },
+#                 expires_in_days=30,
+#             )
+#         else:
+#             create_notification(
+#                 recipient=request.user,
+#                 type=Notification.Type.HOST_APPLICATION_SUBMITTED,
+#                 title="Application submitted",
+#                 message="Your host application has been submitted and is now under review.",
+#                 actor=request.user,
+#                 priority=Notification.Priority.MEDIUM,
+#                 data={
+#                     "application_id": application.id,
+#                     "url": "/profile",
+#                 },
+#                 expires_in_days=7,
+#             )
+
+#             notify_admins(
+#                 type=Notification.Type.ADMIN_NEW_HOST_APPLICATION,
+#                 title="New host application",
+#                 message=f"{request.user.first_name} {request.user.last_name} submitted a new host application.",
+#                 actor=request.user,
+#                 priority=Notification.Priority.HIGH,
+#                 data={
+#                     "application_id": application.id,
+#                     "url": "/admin",
+#                 },
+#                 expires_in_days=30,
+#             )
+
+
+#         return Response(
+#             HostApplicationSerializer(application, context={"request": request}).data,
+#             status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
+#         )
 class HostApplicationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1387,14 +1580,19 @@ class HostApplicationCreateView(APIView):
             )
 
     def post(self, request):
-        if request.user.host_application_status in ["pending", "approved"]:
-            return Response(
-                {"detail": "You already have an active application."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
             application = HostApplication.objects.get(user=request.user)
+            current_status = application.status
+
+            if (
+                current_status == "approved"
+                or request.user.host_application_status == "approved"
+            ):
+                return Response(
+                    {"detail": "Your host application is already approved."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             serializer = HostApplicationSerializer(
                 application,
                 data=request.data,
@@ -1402,68 +1600,96 @@ class HostApplicationCreateView(APIView):
                 context={"request": request},
             )
             is_update = True
+
         except HostApplication.DoesNotExist:
+            application = None
+            current_status = "none"
             serializer = HostApplicationSerializer(
                 data=request.data,
                 context={"request": request},
             )
             is_update = False
 
-        if serializer.is_valid():
-            serializer.save()
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        application = serializer.save()
+
+        # status handling
+        if not is_update:
+            application.status = "pending"
+            application.save(update_fields=["status"])
             request.user.host_application_status = "pending"
             request.user.save(update_fields=["host_application_status"])
 
-            application = HostApplication.objects.get(user=request.user)
+        elif current_status in ["needs_more_info", "rejected"]:
+            application.status = "pending"
+            application.save(update_fields=["status"])
+            request.user.host_application_status = "pending"
+            request.user.save(update_fields=["host_application_status"])
 
-            if is_update:
-                notify_admins(
-                    type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
-                    title="Host application updated",
-                    message=f"{request.user.first_name} {request.user.last_name} updated their host application.",
-                    actor=request.user,
-                    priority=Notification.Priority.HIGH,
-                    data={
-                        "application_id": application.id,
-                        "url": "/admin",
-                    },
-                    expires_in_days=30,
-                )
-            else:
-                create_notification(
-                    recipient=request.user,
-                    type=Notification.Type.HOST_APPLICATION_SUBMITTED,
-                    title="Application submitted",
-                    message="Your host application has been submitted and is now under review.",
-                    actor=request.user,
-                    priority=Notification.Priority.MEDIUM,
-                    data={
-                        "application_id": application.id,
-                        "url": "/profile",
-                    },
-                    expires_in_days=7,
-                )
+        # pending users can edit, but status stays pending
 
-                notify_admins(
-                    type=Notification.Type.ADMIN_NEW_HOST_APPLICATION,
-                    title="New host application",
-                    message=f"{request.user.first_name} {request.user.last_name} submitted a new host application.",
-                    actor=request.user,
-                    priority=Notification.Priority.HIGH,
-                    data={
-                        "application_id": application.id,
-                        "url": "/admin",
-                    },
-                    expires_in_days=30,
-                )
+        if is_update and current_status in ["needs_more_info", "rejected"]:
+            notify_admins(
+                type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
+                title="Host application resubmitted",
+                message=f"{request.user.first_name} {request.user.last_name} resubmitted their host application.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "application_id": application.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
 
-                return Response(
-                    serializer.data,
-                    status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
-                )
+        elif is_update and current_status == "pending":
+            notify_admins(
+                type=Notification.Type.ADMIN_HOST_APPLICATION_RESUBMITTED,
+                title="Host application updated",
+                message=f"{request.user.first_name} {request.user.last_name} updated their pending host application.",
+                actor=request.user,
+                priority=Notification.Priority.MEDIUM,
+                data={
+                    "application_id": application.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
 
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            create_notification(
+                recipient=request.user,
+                type=Notification.Type.HOST_APPLICATION_SUBMITTED,
+                title="Application submitted",
+                message="Your host application has been submitted and is now under review.",
+                actor=request.user,
+                priority=Notification.Priority.MEDIUM,
+                data={
+                    "application_id": application.id,
+                    "url": "/profile",
+                },
+                expires_in_days=7,
+            )
+
+            notify_admins(
+                type=Notification.Type.ADMIN_NEW_HOST_APPLICATION,
+                title="New host application",
+                message=f"{request.user.first_name} {request.user.last_name} submitted a new host application.",
+                actor=request.user,
+                priority=Notification.Priority.HIGH,
+                data={
+                    "application_id": application.id,
+                    "url": "/admin",
+                },
+                expires_in_days=30,
+            )
+
+        return Response(
+            HostApplicationSerializer(application, context={"request": request}).data,
+            status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED,
+        )
 
 
 # class ListingViewSet(GenericViewSet):
