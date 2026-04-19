@@ -61,11 +61,11 @@
 //         <div className="listing-card-title">{listing.title}</div>
 
 //         {listing.highlight && (
-//           <div className="listing-card-highlight">✨ {listing.highlight}</div>
+//           <div className="listing-card-highlight">{listing.highlight}</div>
 //         )}
 
 //         <div className="listing-card-location">
-//           <i className="bi bi-geo-alt"></i> {listing.city}, {listing.region},{" "}
+//           <i className="bi bi-geo-alt"></i> {listing.city}, {listing.region},{' '}
 //           {listing.province}
 //         </div>
 
@@ -85,9 +85,17 @@
 //   const [detailLoading, setDetailLoading] = useState(false);
 //   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm || '');
 
+//   const [currentPage, setCurrentPage] = useState(1);
+//   const [totalCount, setTotalCount] = useState(0);
+//   const [nextPageUrl, setNextPageUrl] = useState(null);
+//   const [previousPageUrl, setPreviousPageUrl] = useState(null);
+
+//   const pageSize = 8;
+
 //   useEffect(() => {
 //     const timer = setTimeout(() => {
 //       setDebouncedSearchTerm(searchTerm || '');
+//       setCurrentPage(1);
 //     }, 400);
 
 //     return () => clearTimeout(timer);
@@ -95,7 +103,7 @@
 
 //   useEffect(() => {
 //     fetchListings();
-//   }, [debouncedSearchTerm]);
+//   }, [debouncedSearchTerm, currentPage]);
 
 //   const fetchListings = async () => {
 //     console.log('Fetching public listings for Home Page...');
@@ -103,30 +111,52 @@
 //     const token = localStorage.getItem('access');
 
 //     try {
-//       const query = debouncedSearchTerm?.trim()
-//         ? `?search=${encodeURIComponent(debouncedSearchTerm.trim())}`
-//         : '';
+//       const params = new URLSearchParams();
 
-//       const response = await fetch(`http://127.0.0.1:8000/api/listings/${query}`, {
-//         headers: token ? { Authorization: `Bearer ${token}` } : {},
-//       });
+//       if (debouncedSearchTerm?.trim()) {
+//         params.append('search', debouncedSearchTerm.trim());
+//       }
+
+//       params.append('page', currentPage);
+
+//       const response = await fetch(
+//         `http://127.0.0.1:8000/api/listings/?${params.toString()}`,
+//         {
+//           headers: token ? { Authorization: `Bearer ${token}` } : {},
+//         }
+//       );
 
 //       if (response.ok) {
 //         const data = await response.json();
 
 //         if (Array.isArray(data)) {
 //           setListings(data);
+//           setTotalCount(data.length);
+//           setNextPageUrl(null);
+//           setPreviousPageUrl(null);
 //         } else if (data && data.results && Array.isArray(data.results)) {
 //           setListings(data.results);
+//           setTotalCount(data.count || 0);
+//           setNextPageUrl(data.next);
+//           setPreviousPageUrl(data.previous);
 //         } else {
 //           setListings([]);
+//           setTotalCount(0);
+//           setNextPageUrl(null);
+//           setPreviousPageUrl(null);
 //         }
 //       } else {
 //         setListings([]);
+//         setTotalCount(0);
+//         setNextPageUrl(null);
+//         setPreviousPageUrl(null);
 //       }
 //     } catch (error) {
 //       console.error('Error fetching listings:', error);
 //       setListings([]);
+//       setTotalCount(0);
+//       setNextPageUrl(null);
+//       setPreviousPageUrl(null);
 //     } finally {
 //       setLoading(false);
 //     }
@@ -168,6 +198,22 @@
 //     }
 //   };
 
+//   const totalPages = Math.ceil(totalCount / pageSize);
+
+//   const goToPreviousPage = () => {
+//     if (previousPageUrl) {
+//       setCurrentPage((prev) => prev - 1);
+//       window.scrollTo({ top: 0, behavior: 'smooth' });
+//     }
+//   };
+
+//   const goToNextPage = () => {
+//     if (nextPageUrl) {
+//       setCurrentPage((prev) => prev + 1);
+//       window.scrollTo({ top: 0, behavior: 'smooth' });
+//     }
+//   };
+
 //   return (
 //     <>
 //       <div className="listings-section">
@@ -188,6 +234,30 @@
 //             </div>
 //           )}
 //         </div>
+
+//         {!loading && totalPages > 1 && (
+//           <div className="pagination-wrapper">
+//             <button
+//               className="pagination-btn"
+//               onClick={goToPreviousPage}
+//               disabled={!previousPageUrl}
+//             >
+//               Previous
+//             </button>
+
+//             <span className="pagination-info">
+//               Page {currentPage} of {totalPages}
+//             </span>
+
+//             <button
+//               className="pagination-btn"
+//               onClick={goToNextPage}
+//               disabled={!nextPageUrl}
+//             >
+//               Next
+//             </button>
+//           </div>
+//         )}
 //       </div>
 
 //       <ListingDetailModal
@@ -202,7 +272,9 @@
 
 // export default ListingsGrid;
 
-import React, { useState, useEffect } from 'react';
+
+
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/ListingsGrid.css';
 import '../styles/ListingDetailModal.css';
 import ListingDetailModal, { WishlistHeart } from './ListingDetailModal';
@@ -294,16 +366,47 @@ const ListingsGrid = ({ searchTerm }) => {
   const [nextPageUrl, setNextPageUrl] = useState(null);
   const [previousPageUrl, setPreviousPageUrl] = useState(null);
 
-  const pageSize = 8;
+  const pageSize = 6;
+  const listingsSectionRef = useRef(null);
+
+  const scrollToListings = () => {
+    if (listingsSectionRef.current) {
+      const yOffset = -110;
+      const y =
+        listingsSectionRef.current.getBoundingClientRect().top +
+        window.pageYOffset +
+        yOffset;
+
+      window.scrollTo({
+        top: y,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm || '');
-      setCurrentPage(1);
+      const nextSearch = searchTerm || '';
+      const trimmedNext = nextSearch.trim();
+      const trimmedCurrent = debouncedSearchTerm.trim();
+
+      if (trimmedNext !== trimmedCurrent) {
+        if (trimmedNext !== '') {
+          scrollToListings();
+
+          setTimeout(() => {
+            setDebouncedSearchTerm(nextSearch);
+            setCurrentPage(1);
+          }, 150);
+        } else {
+          setDebouncedSearchTerm(nextSearch);
+          setCurrentPage(1);
+        }
+      }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, debouncedSearchTerm]);
 
   useEffect(() => {
     fetchListings();
@@ -406,21 +509,27 @@ const ListingsGrid = ({ searchTerm }) => {
 
   const goToPreviousPage = () => {
     if (previousPageUrl) {
-      setCurrentPage((prev) => prev - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToListings();
+
+      setTimeout(() => {
+        setCurrentPage((prev) => prev - 1);
+      }, 150);
     }
   };
 
   const goToNextPage = () => {
     if (nextPageUrl) {
-      setCurrentPage((prev) => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToListings();
+
+      setTimeout(() => {
+        setCurrentPage((prev) => prev + 1);
+      }, 150);
     }
   };
 
   return (
     <>
-      <div className="listings-section">
+      <div className="listings-section" ref={listingsSectionRef}>
         <div className="listings-grid">
           {loading ? (
             <div className="no-listings">Loading listings...</div>
